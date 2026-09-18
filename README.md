@@ -55,11 +55,13 @@ Copy `.env.example` → `.env.local`:
 | --- | --- |
 | `VITE_LISTINGS_API` | URL of the `public-listings` endpoint (live Guesty listings). |
 | `VITE_GUESTY_BOOKING_URL` | Guesty Booking Engine base URL, for booking deep-links. |
+| `VITE_OWNER_LEAD_API` | Optional. Overrides the `owner-lead` endpoint URL (defaults to this project's). The "Free earnings estimate" form calls it and it emails the submission to the function's `LEAD_NOTIFY_TO` address. |
 
 ## Notes
 
 - Fonts (Switzer, Tanker) are self-hosted in `public/fonts` — no external font CDN.
 - The original hand-built HTML is preserved at `legacy/original.html` for reference.
-- Owners' "earnings estimate" form composes an email on submit; point it at a
-  real form endpoint later if you'd rather capture leads server-side.
+- Owners' "earnings estimate" form POSTs to the `owner-lead` Supabase Edge Function
+  ([`backend/supabase/functions/owner-lead`](../backend/supabase/functions/owner-lead/index.ts)),
+  which emails the submission via Resend. Nothing is stored.
 # philiphilandwebsite

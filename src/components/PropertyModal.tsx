@@ -1,0 +1,212 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { Listing } from "../data/types.ts";
+import { useAvailability } from "../hooks/useAvailability.ts";
+import { useLockBodyScroll } from "../hooks/useLockBodyScroll.ts";
+import { buildBookingUrl, buildEnquiryMailto, money, stayCost } from "../lib/booking.ts";
+import { RangePicker } from "./RangePicker.tsx";
+
+const checkSVG = (
+  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3">
+    <path d="M2 7.4l3.2 3.2L12 3.8" />
+  </svg>
+);
+
+interface Props {
+  listing: Listing;
+  guests: number;
+  onClose: () => void;
+}
+
+/**
+ * Matches the prototype's `.modal` markup: a photo gallery on the left, a
+ * details + booking rail on the right. Availability comes from
+ * useAvailability() for this specific listing, degrading to "unknown" (no
+ * strike-throughs) rather than the prototype's seeded fake bookings.
+ */
+export function PropertyModal({ listing, guests, onClose }: Props) {
+  useLockBodyScroll(true);
+  const [cur, setCur] = useState(0);
+  const [checkIn, setCheckIn] = useState<string | null>(null);
+  const [checkOut, setCheckOut] = useState<string | null>(null);
+  const [requested, setRequested] = useState(false);
+  const bgRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+
+  const availability = useAvailability(listing.id);
+  const photos = listing.photos;
+  const quote = stayCost(listing, checkIn, checkOut);
+
+  // The scrim animates its own blur. Adding the "on" class in the same paint
+  // as mount collapses the transition to nothing, because the browser
+  // composites a filtered layer in one step rather than interpolating it —
+  // so the class needs to land a frame after the element exists. A forced
+  // synchronous reflow (reading offsetHeight) guarantees that frame boundary
+  // without depending on requestAnimationFrame, which never fires in a
+  // background tab and would leave the dialog with no scrim at all.
+  useLayoutEffect(() => {
+    void bgRef.current?.offsetHeight;
+    bgRef.current?.classList.add("on");
+    cardRef.current?.classList.add("on");
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") setCur((v) => (v - 1 + photos.length) % photos.length);
+      if (e.key === "ArrowRight") setCur((v) => (v + 1) % photos.length);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose, photos.length]);
+
+  // Centre the active thumbnail by scrolling the strip itself. scrollIntoView()
+  // would also scroll every scrollable ancestor — including the overflow:hidden
+  // card — which pushed the title and close button out of view on open.
+  useEffect(() => {
+    const strip = thumbRef.current;
+    const t = strip?.children[cur] as HTMLElement | undefined;
+    if (!strip || !t) return;
+    const s = strip.getBoundingClientRect();
+    const r = t.getBoundingClientRect();
+    strip.scrollTo({ left: strip.scrollLeft + (r.left - s.left) - (s.width - r.width) / 2, behavior: "smooth" });
+  }, [cur]);
+
+  const query = { listingId: listing.id, name: listing.name, checkIn: checkIn ?? undefined, checkOut: checkOut ?? undefined, guests };
+  const bookUrl = buildBookingUrl(query);
+
+  return (
+    <div className="modal open" id="modal" role="dialog" aria-modal="true" aria-label="Property details">
+      <div className="modal-bg" ref={bgRef} onClick={onClose} />
+      <div className="modal-card" ref={cardRef}>
+        <button className="modal-close" aria-label="Close" onClick={onClose}>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M1 1l13 13M14 1L1 14" stroke="currentColor" strokeWidth="1.3" />
+          </svg>
+        </button>
+
+        <div className="gal">
+          <div className="gal-main">
+            {photos.map((src, i) => (
+              <img key={src} src={src} alt={`${listing.name} photo ${i + 1}`} className={i === cur ? "on" : undefined} loading={i ? "lazy" : undefined} />
+            ))}
+          </div>
+          {photos.length > 1 && (
+            <>
+              <button className="gal-nav prev" aria-label="Previous photo" onClick={() => setCur((v) => (v - 1 + photos.length) % photos.length)}>
+                <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+                  <path d="M8 1L1.5 7.5 8 14" stroke="currentColor" strokeWidth="1.3" />
+                </svg>
+              </button>
+              <button className="gal-nav next" aria-label="Next photo" onClick={() => setCur((v) => (v + 1) % photos.length)}>
+                <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+                  <path d="M1 1l6.5 6.5L1 14" stroke="currentColor" strokeWidth="1.3" />
+                </svg>
+              </button>
+              <span className="gal-idx">
+                {cur + 1} / {photos.length}
+              </span>
+            </>
+          )}
+          <div className="gal-thumbs" ref={thumbRef}>
+            {photos.map((src, i) => (
+              <button key={src} type="button" className={i === cur ? "on" : undefined} aria-label={`Photo ${i + 1}`} onClick={() => setCur(i)}>
+                <img src={src} alt="" loading="lazy" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="modal-side">
+          <span className="card-loc">
+            {listing.town} &nbsp;·&nbsp; {listing.type} &nbsp;·&nbsp; Phillip Island
+          </span>
+          <h3>{listing.name}</h3>
+          <div className="modal-specs">
+            {listing.guests} guests<i className="dot" />
+            {listing.bedrooms} bedrooms<i className="dot" />
+            {listing.bathrooms} bath{listing.bathrooms === 1 ? "" : "s"}
+          </div>
+          <p className="modal-desc">{listing.summary}</p>
+          {listing.amenities.length > 0 && (
+            <div className="amen">
+              {listing.amenities.map((a) => (
+                <div key={a}>
+                  {checkSVG}
+                  {a}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="book">
+            <div className="book-dates">
+              <RangePicker
+                checkIn={checkIn}
+                checkOut={checkOut}
+                onChange={(a, b) => {
+                  setCheckIn(a);
+                  setCheckOut(b);
+                }}
+                booked={availability.booked}
+                availabilityKnown={availability.known}
+              />
+            </div>
+            <div className="book-sum">
+              {!quote ? (
+                <div className="row">
+                  <span>{money(listing.price, listing.currency)} a night</span>
+                  <span>Add dates for a total</span>
+                </div>
+              ) : (
+                <>
+                  <div className="row">
+                    <span>
+                      {money(listing.price, listing.currency)} &times; {quote.nights} night{quote.nights === 1 ? "" : "s"}
+                    </span>
+                    <span>{money(quote.stay, listing.currency)}</span>
+                  </div>
+                  {quote.clean > 0 && (
+                    <div className="row">
+                      <span>Cleaning &amp; linen</span>
+                      <span>{money(quote.clean, listing.currency)}</span>
+                    </div>
+                  )}
+                  {quote.disc > 0 && (
+                    <div className="row" style={{ color: "var(--sea)" }}>
+                      <span>Weekly stay discount</span>
+                      <span>&minus;{money(quote.disc, listing.currency)}</span>
+                    </div>
+                  )}
+                  <div className="row">
+                    <span>Booking fee</span>
+                    <span style={{ color: "var(--sea)" }}>None</span>
+                  </div>
+                  <div className="row total">
+                    <span>Total</span>
+                    <b>{money(quote.total, listing.currency)}</b>
+                  </div>
+                </>
+              )}
+            </div>
+            {bookUrl ? (
+              <a href={bookUrl} target="_blank" rel="noreferrer" className="btn">
+                Request to book
+              </a>
+            ) : (
+              <a
+                href={buildEnquiryMailto(query)}
+                className="btn"
+                onClick={() => setRequested(true)}
+                style={requested ? { opacity: 0.72, pointerEvents: "none" } : undefined}
+              >
+                {requested ? "Request sent" : "Request to book"}
+              </a>
+            )}
+            <p className="note">Nothing is charged yet. We confirm availability first.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

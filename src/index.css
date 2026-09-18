@@ -1,0 +1,8 @@
+/* Phillip Island Host — public marketing site.
+   The visual system is the hand-built stylesheet in ./styles/prototype.css,
+   ported verbatim from the approved single-file prototype. Components emit
+   its class names (.hdr, .sec, .card, .dp-d …) rather than utility classes,
+   so the rendered result matches the reference byte-for-byte on spacing,
+   easing and type. Do not re-express these rules as utilities. */
+@import "./styles/fonts.css";
+@import "./styles/prototype.css";
