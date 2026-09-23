@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { useBooking } from "../context/booking.tsx";
 import { usePanel } from "../hooks/usePanel.ts";
+import { searchHorizon } from "../lib/dates.ts";
 import { HOMES_HASH } from "../lib/route.ts";
 import { RangePicker } from "./RangePicker.tsx";
 
@@ -20,12 +21,15 @@ const TOWNS: { value: string; label: string; note: string }[] = [
   { value: "San Remo", label: "San Remo", note: "Mainland side, pelicans at noon" },
 ];
 
+/** Availability is only known about a year ahead, so the calendar stops there. */
+const MAX_DATE = searchHorizon();
+
 /**
  * The hero search bar: destination dropdown, the two-month RangePicker, a
  * guests popover, and Search. Matches the prototype's `.searchbar` grid.
- * Submitting applies destination + guest count as the filter (dates already
- * affect every card's live total as they're picked) and opens the full
- * listing page, which reads that filter.
+ * Submitting applies destination, guest count and dates as the search and
+ * opens the full listing page, which hides the homes that aren't free for
+ * those dates.
  */
 export function SearchBar() {
   const b = useBooking();
@@ -99,6 +103,7 @@ export function SearchBar() {
         checkIn={b.checkIn}
         checkOut={b.checkOut}
         onChange={b.setRange}
+        maxDate={MAX_DATE}
       />
 
       <div className={`sf${guests.open ? " is-active" : ""}`} id="guestField">

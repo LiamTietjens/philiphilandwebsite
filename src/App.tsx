@@ -49,9 +49,9 @@ function Page() {
         ) : (
           <>
             <Hero />
-            <TrustStrip />
+            <TrustStrip count={listings.length} />
             <Stays listings={listings} status={status} onOpen={setActive} />
-            <Story />
+            <Story listings={listings} />
             <Included />
             <IslandGuide />
             <Quotes />
@@ -60,7 +60,15 @@ function Page() {
         )}
       </main>
       <Footer />
-      {active && <PropertyModal listing={active} guests={b.guests} onClose={() => setActive(null)} />}
+      {active && (
+        <PropertyModal
+          listing={active}
+          guests={b.guests}
+          adults={b.adults}
+          initialStay={{ checkIn: b.checkIn, checkOut: b.checkOut }}
+          onClose={() => setActive(null)}
+        />
+      )}
     </>
   );
 }

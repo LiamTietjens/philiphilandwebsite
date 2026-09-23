@@ -15,6 +15,11 @@ interface Props {
   /** False when availability is unknown — no strike-throughs, and the info
    *  line says so instead of implying every date is free. */
   availabilityKnown?: boolean;
+  /** True while availability is still loading — the info line says so. */
+  checking?: boolean;
+  /** Last day that can be picked. Availability is only known this far ahead, so
+   *  the calendar stops here rather than showing later dates as free. */
+  maxDate?: string;
 }
 
 /** A stay cannot straddle someone else's booking. */
@@ -45,6 +50,8 @@ export function RangePicker({
   onChange,
   booked,
   availabilityKnown = true,
+  checking = false,
+  maxDate,
 }: Props) {
   const panel = usePanel<HTMLDivElement, HTMLDivElement>();
   const [active, setActive] = useState<"in" | "out">("in");
@@ -54,6 +61,9 @@ export function RangePicker({
   );
 
   const monthB = addMonths(view, 1);
+  // Stop paging once the second visible month is the last one with known dates.
+  const lastMonth = maxDate ? new Date(parseISO(maxDate).getFullYear(), parseISO(maxDate).getMonth(), 1) : null;
+  const isLastMonth = !!lastMonth && monthB >= lastMonth;
   const isFirstMonth = view.getFullYear() === TODAY.getFullYear() && view.getMonth() === TODAY.getMonth();
   const end = checkOut || (active === "out" ? hover : null);
 
@@ -63,7 +73,9 @@ export function RangePicker({
     : checkIn
       ? "Now pick your last night"
       : !availabilityKnown
-        ? "Availability isn't confirmed yet — we'll check when you book"
+        ? checking
+          ? "Checking availability…"
+          : "Availability isn't confirmed yet — we'll check when you book"
         : booked && booked.size > 0
           ? "Crossed out dates are already booked"
           : "Pick your arrival date";
@@ -101,22 +113,29 @@ export function RangePicker({
       const date = new Date(base.getFullYear(), base.getMonth(), d);
       const key = iso(date);
       const past = date < TODAY;
+      const beyond = !!maxDate && key > maxDate;
       const taken = availabilityKnown && !!booked?.has(key);
+      // Departing on the day the next guest arrives is fine: that night isn't
+      // part of the stay. A booked day is only usable as a check-out, and only
+      // when every night before it is free.
+      const turnover =
+        taken && !past && active === "out" && !!checkIn && key > checkIn && spanClear(booked, checkIn, key);
       const classes: string[] = [];
-      if (past) classes.push("is-off");
-      if (taken && !past) classes.push("is-booked");
+      if (past || beyond) classes.push("is-off");
+      if (taken && !past && !beyond) classes.push("is-booked");
+      if (turnover) classes.push("is-turnover");
       if (key === TODAY_ISO) classes.push("is-today");
       if (checkIn && key === checkIn) classes.push("is-in");
       if (checkOut && key === checkOut) classes.push("is-out");
       if (checkIn && end && key > checkIn && key < end && spanClear(booked, checkIn, key)) classes.push("is-mid");
       if (checkIn && checkOut && checkIn === checkOut) classes.push("is-solo");
-      cells.push({ key, day: d, disabled: past || taken, classes });
+      cells.push({ key, day: d, disabled: past || beyond || (taken && !turnover), classes });
     }
     return { lead, cells };
   }
 
-  const gridA = useMemo(() => monthDays(view), [view, checkIn, checkOut, hover, active, booked, availabilityKnown]);
-  const gridB = useMemo(() => monthDays(monthB), [monthB, checkIn, checkOut, hover, active, booked, availabilityKnown]);
+  const gridA = useMemo(() => monthDays(view), [view, checkIn, checkOut, hover, active, booked, availabilityKnown, maxDate]);
+  const gridB = useMemo(() => monthDays(monthB), [monthB, checkIn, checkOut, hover, active, booked, availabilityKnown, maxDate]);
 
   function renderMonth(grid: ReturnType<typeof monthDays>) {
     return (
@@ -137,7 +156,7 @@ export function RangePicker({
               className={["dp-d", ...c.classes].join(" ")}
               data-d={c.key}
               disabled={c.disabled}
-              title={c.classes.includes("is-booked") ? "Already booked" : undefined}
+              title={c.classes.includes("is-turnover") ? "Check-out only" : c.classes.includes("is-booked") ? "Already booked" : undefined}
               onClick={() => pick(c.key, c.disabled)}
               onMouseOver={() => {
                 if (!c.disabled && active === "out" && checkIn) setHover(c.key);
@@ -207,7 +226,13 @@ export function RangePicker({
                   {MONTHS[monthB.getMonth()]} {monthB.getFullYear()}
                 </span>
               </div>
-              <button type="button" className="dp-nav" aria-label="Next month" onClick={() => setView((v) => addMonths(v, 1))}>
+              <button
+                type="button"
+                className="dp-nav"
+                aria-label="Next month"
+                disabled={isLastMonth}
+                onClick={() => setView((v) => addMonths(v, 1))}
+              >
                 <svg width="7" height="11" viewBox="0 0 7 11" fill="none">
                   <path d="M1 1l4.5 4.5L1 10" stroke="currentColor" strokeWidth="1.4" />
                 </svg>

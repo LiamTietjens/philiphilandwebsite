@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, fmtDay, iso, monthShape, nightsBetween, parseISO } from "../dates.ts";
+import { addMonths, fmtDay, iso, monthShape, nightsBetween, nightsOf, parseISO } from "../dates.ts";
 
 describe("iso / parseISO", () => {
   it("round-trips a local date without a UTC day shift", () => {
@@ -56,5 +56,22 @@ describe("addMonths", () => {
     expect(d.getFullYear()).toBe(2027);
     expect(d.getMonth()).toBe(0);
     expect(d.getDate()).toBe(1); // always normalized to the 1st
+  });
+});
+
+describe("nightsOf", () => {
+  it("lists each night of a stay — arrival day up to, but not including, departure", () => {
+    expect(nightsOf("2026-10-13", "2026-10-16")).toEqual(["2026-10-13", "2026-10-14", "2026-10-15"]);
+  });
+
+  it("crosses month and year boundaries", () => {
+    expect(nightsOf("2026-12-30", "2027-01-02")).toEqual(["2026-12-30", "2026-12-31", "2027-01-01"]);
+  });
+
+  it("is empty without both dates or a positive stay", () => {
+    expect(nightsOf(null, "2026-10-16")).toEqual([]);
+    expect(nightsOf("2026-10-13", null)).toEqual([]);
+    expect(nightsOf("2026-10-13", "2026-10-13")).toEqual([]);
+    expect(nightsOf("2026-10-16", "2026-10-13")).toEqual([]);
   });
 });

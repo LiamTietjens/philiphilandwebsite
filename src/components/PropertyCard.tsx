@@ -1,6 +1,6 @@
 import type { Listing } from "../data/types.ts";
-import { useBooking } from "../context/booking.tsx";
-import { money, stayCost } from "../lib/booking.ts";
+import { money } from "../lib/booking.ts";
+import type { Quote } from "../lib/booking.ts";
 
 const arrow = (
   <svg width="17" height="9" viewBox="0 0 17 9" fill="none">
@@ -18,13 +18,15 @@ interface Props {
   listing: Listing;
   index: number;
   onOpen: () => void;
+  /** The home's real "from" price (its cheapest open night, from Guesty's
+   *  calendar). undefined = still loading · null = Guesty didn't give one. */
+  from?: number | null;
+  /** Total for the searched dates from Guesty's per-night prices, when available. */
+  quote?: Quote | null;
 }
 
-/** Matches the prototype's `.card` markup exactly. */
-export function PropertyCard({ listing, index, onOpen }: Props) {
-  const b = useBooking();
-  const quote = stayCost(listing, b.checkIn, b.checkOut);
-
+/** Matches the prototype's `.card` markup, with prices that come only from Guesty's calendar. */
+export function PropertyCard({ listing, index, onOpen, from, quote }: Props) {
   return (
     <button
       type="button"
@@ -68,7 +70,13 @@ export function PropertyCard({ listing, index, onOpen }: Props) {
         <span className="card-foot">
           <span className="price">
             <em>From</em>
-            <b>{money(listing.price, listing.currency)}</b> <i>/ night</i>
+            {typeof from === "number" ? (
+              <>
+                <b>{money(from, listing.currency)}</b> <i>/ night</i>
+              </>
+            ) : (
+              <b className="price-na">{from === undefined ? "Loading price…" : "Price on request"}</b>
+            )}
             {quote && (
               <span className="stay on">
                 {quote.nights} night{quote.nights === 1 ? "" : "s"} &middot;{" "}

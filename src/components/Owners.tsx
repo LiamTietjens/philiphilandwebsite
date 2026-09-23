@@ -1,14 +1,11 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { OWNER_LEAD_API } from "../lib/api.ts";
 import { ENQUIRY_EMAIL } from "../lib/booking.ts";
 
-// The owner-lead Supabase Edge Function (backend/supabase/functions/owner-lead):
-// emails the submission to the address it is configured with (its
-// LEAD_NOTIFY_TO secret). The URL is public, so it is the default;
-// VITE_OWNER_LEAD_API overrides it, e.g. to point at another Supabase project.
-const API =
-  (import.meta.env.VITE_OWNER_LEAD_API as string | undefined) ||
-  "https://ictumlksmzjenevtaqvp.supabase.co/functions/v1/owner-lead";
+// The owner-lead Supabase Edge Function (backend/supabase/functions/owner-lead)
+// emails the submission to the address it is configured with (LEAD_NOTIFY_TO).
+const API = OWNER_LEAD_API;
 
 type Status = "idle" | "sending" | "sent" | "error";
 

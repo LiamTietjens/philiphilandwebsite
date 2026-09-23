@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Chip, Listing } from "../data/types.ts";
-import { SAMPLE_LISTINGS } from "../data/sample.ts";
+import { LISTINGS_API } from "../lib/api.ts";
 import { badgeFor, tagsFor } from "../lib/amenities.ts";
 
-export type ListingsStatus = "loading" | "ready" | "sample";
+export type ListingsStatus = "loading" | "ready" | "error";
 
 interface State {
   listings: Listing[];
@@ -14,7 +14,7 @@ interface State {
 // secret and mints one shared token server-side (see
 // backend/supabase/functions/public-listings), rather than the browser
 // minting its own against Guesty's ~5-token/24h cap.
-const API = import.meta.env.VITE_LISTINGS_API as string | undefined;
+const API = LISTINGS_API;
 
 interface RawListing {
   id: string;
@@ -41,19 +41,21 @@ function mapListing(r: RawListing): Listing {
 
 /**
  * Loads listings from the public-listings endpoint (Guesty-backed via our
- * Supabase backend). Falls back to bundled samples when the endpoint is
- * unset or unreachable, so the site always renders.
+ * Supabase backend). If that fails or is too slow the status becomes "error"
+ * and the page says so — it never substitutes made-up sample homes.
  */
 export function useListings(): State {
   const [state, setState] = useState<State>({
-    listings: API ? [] : SAMPLE_LISTINGS,
-    status: API ? "loading" : "sample",
+    listings: [],
+    status: "loading",
   });
 
   useEffect(() => {
-    if (!API) return;
     let alive = true;
     const ctrl = new AbortController();
+
+    // A stuck request must end in an honest error, not an endless "Loading…".
+    const timer = setTimeout(() => ctrl.abort(), 30_000);
 
     fetch(API, { signal: ctrl.signal })
       .then((r) => {
@@ -63,11 +65,12 @@ export function useListings(): State {
       .then((data: RawListing[]) => {
         if (!alive) return;
         const listings = Array.isArray(data) ? data.map(mapListing) : [];
-        setState(listings.length ? { listings, status: "ready" } : { listings: SAMPLE_LISTINGS, status: "sample" });
+        setState(listings.length ? { listings, status: "ready" } : { listings: [], status: "error" });
       })
       .catch(() => {
-        if (alive) setState({ listings: SAMPLE_LISTINGS, status: "sample" });
-      });
+        if (alive) setState({ listings: [], status: "error" });
+      })
+      .finally(() => clearTimeout(timer));
 
     return () => {
       alive = false;

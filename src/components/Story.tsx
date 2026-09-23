@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useListings } from "../hooks/useListings.ts";
+import type { Listing } from "../data/types.ts";
 
 const arrow = (
   <svg width="17" height="9" viewBox="0 0 17 9" fill="none">
@@ -13,8 +13,7 @@ const arrow = (
  * and town spread; "2019" is a founding date, not guest data, so it stays
  * as written.
  */
-export function Story() {
-  const { listings } = useListings();
+export function Story({ listings }: { listings: Listing[] }) {
   const towns = useMemo(() => new Set(listings.map((l) => l.town)).size, [listings]);
 
   return (

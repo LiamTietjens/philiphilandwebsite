@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Chip, Listing } from "../../data/types.ts";
-import { FEATURED_COUNT, featuredListings, filterListings } from "../filter.ts";
+import { FEATURED_COUNT, featuredListings, filterListings, type StayMap } from "../filter.ts";
 
 const home = (id: string, over: Partial<Listing> = {}): Listing => ({
   id,
@@ -79,5 +79,45 @@ describe("filterListings", () => {
 
   it("falls back to a tag match for a chip value that is not in the chip list", () => {
     expect(ids(filterListings(all, chips, null, "Pet friendly"))).toEqual(ids(filterListings(all, [], null, "Pet friendly")));
+  });
+});
+
+describe("filterListings — availability for the searched dates", () => {
+  const all = [home("free"), home("booked"), home("short-stay"), home("unknown"), home("not-in-map")];
+  const ids = (ls: Listing[]) => ls.map((l) => l.id);
+  const stay: StayMap = {
+    free: { known: true, available: true, nightly: [200, 200] },
+    booked: { known: true, available: false, reason: "booked" },
+    "short-stay": { known: true, available: false, reason: "min_nights", minNights: 3 },
+    unknown: { known: false },
+  };
+
+  it("hides homes Guesty says are booked for those dates", () => {
+    expect(ids(filterListings(all, chips, null, "all", stay))).not.toContain("booked");
+  });
+
+  it("hides homes whose minimum stay the searched dates don't meet", () => {
+    expect(ids(filterListings(all, chips, null, "all", stay))).not.toContain("short-stay");
+  });
+
+  it("keeps homes that are available", () => {
+    expect(ids(filterListings(all, chips, null, "all", stay))).toContain("free");
+  });
+
+  it("never hides a home just because its availability is unknown, or it wasn't checked", () => {
+    const shown = ids(filterListings(all, chips, null, "all", stay));
+    expect(shown).toContain("unknown");
+    expect(shown).toContain("not-in-map");
+  });
+
+  it("changes nothing when no dates were searched", () => {
+    expect(ids(filterListings(all, chips, null, "all", null))).toEqual(ids(all));
+    expect(ids(filterListings(all, chips, null, "all"))).toEqual(ids(all));
+  });
+
+  it("combines with the destination, guest and chip filters", () => {
+    const mixed = [home("a", { town: "Cowes" }), home("b", { town: "Newhaven" }), home("c", { town: "Newhaven" })];
+    const st: StayMap = { b: { known: true, available: false, reason: "booked" }, c: { known: true, available: true } };
+    expect(ids(filterListings(mixed, chips, { dest: "Newhaven", guests: 1 }, "all", st))).toEqual(["c"]);
   });
 });
