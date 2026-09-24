@@ -43,3 +43,9 @@ export interface Chip {
   /** "town" matches Listing.town; "tag" matches a derived display tag. */
   kind: "all" | "town" | "tag";
 }
+
+/**
+ * Opens a home's popup. `prefill: false` = don't carry the searched dates in (a
+ * partial match isn't bookable for them); `hint` is a line shown in the popup.
+ */
+export type OpenListing = (listing: Listing, opts?: { prefill?: boolean; hint?: string }) => void;

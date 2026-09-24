@@ -1,4 +1,4 @@
-import type { Listing } from "../data/types.ts";
+import type { Listing, OpenListing } from "../data/types.ts";
 import type { ListingsStatus } from "../hooks/useListings.ts";
 import { useFromPrices } from "../hooks/useLivePricing.ts";
 import { featuredListings } from "../lib/filter.ts";
@@ -14,7 +14,7 @@ const arrow = (
 interface Props {
   listings: Listing[];
   status: ListingsStatus;
-  onOpen: (listing: Listing) => void;
+  onOpen: OpenListing;
 }
 
 /**

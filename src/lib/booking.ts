@@ -1,54 +1,18 @@
-import type { Listing } from "../data/types.ts";
-import { nightsBetween } from "./dates.ts";
-
 /** "A$1,240" — the prototype's money format, en-AU grouping. */
 export const money = (n: number, currency = "AUD"): string => {
   const prefix = currency === "AUD" ? "A$" : `${currency} `;
   return prefix + Math.round(n).toLocaleString("en-AU");
 };
 
-export interface Quote {
-  nights: number;
-  /** Sum of the nightly prices, before fees or discounts. */
-  stay: number;
-  /** Guesty prices.cleaningFee. 0 across most of this portfolio. */
-  clean: number;
-  /** Weekly discount, from Guesty's weeklyPriceFactor. 0 when none applies. */
-  disc: number;
-  total: number;
-}
-
 /**
- * The cost of a stay, from Guesty's own per-night calendar prices.
- *
- * A listing's flat `basePrice` is NOT what Guesty charges: the calendar prices
- * each night individually (seasonal / dynamic pricing), and on a live check the
- * base rate matched the calendar on almost no nights and overstated it by up to
- * a third. So the total is only computed when `nightly` — one real price per
- * night of the stay — is supplied. Without it this returns null; it never
- * falls back to the base rate.
- *
- * Cleaning fee and the weekly discount are the listing's real Guesty values
- * (most of this portfolio reports cleaningFee 0 and weeklyPriceFactor 1). Rows
- * for a zero fee or zero discount are simply not rendered.
+ * The average of Guesty's own per-night prices for a stay, rounded. This is the
+ * nightly rate BEFORE fees and taxes — Guesty adds a markup, bundled fees and a
+ * levy at checkout, so the calendar's nights do not sum to what a guest pays and
+ * the site never presents them as a total. Null without prices; never a guess.
  */
-export function stayCost(
-  listing: Listing,
-  a: string | null,
-  b: string | null,
-  nightly: number[] | undefined,
-): Quote | null {
-  const nights = nightsBetween(a, b);
-  if (nights <= 0) return null;
-  if (!nightly || nightly.length !== nights) return null;
-
-  const stay = nightly.reduce((sum, n) => sum + n, 0);
-  const factor = listing.weeklyFactor;
-  // Guesty expresses a weekly discount as a multiplier < 1 (0.9 = 10% off).
-  const disc = nights >= 7 && factor > 0 && factor < 1 ? Math.round(stay * (1 - factor)) : 0;
-  const clean = listing.cleaningFee;
-
-  return { nights, stay, clean, disc, total: stay + clean - disc };
+export function avgNightly(nightly: number[] | undefined): number | null {
+  if (!nightly || nightly.length === 0) return null;
+  return Math.round(nightly.reduce((sum, n) => sum + n, 0) / nightly.length);
 }
 
 // ─── outbound links ─────────────────────────────────────────────────────────

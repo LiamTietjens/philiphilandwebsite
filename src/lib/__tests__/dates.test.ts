@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, fmtDay, iso, monthShape, nightsBetween, nightsOf, parseISO } from "../dates.ts";
+import { addMonths, fmtDay, iso, monthShape, fmtRange, nightsBetween, nightsOf, parseISO } from "../dates.ts";
 
 describe("iso / parseISO", () => {
   it("round-trips a local date without a UTC day shift", () => {
@@ -73,5 +73,20 @@ describe("nightsOf", () => {
     expect(nightsOf("2026-10-13", null)).toEqual([]);
     expect(nightsOf("2026-10-13", "2026-10-13")).toEqual([]);
     expect(nightsOf("2026-10-16", "2026-10-13")).toEqual([]);
+  });
+});
+
+describe("fmtRange", () => {
+  it("collapses the month when both ends share it", () => {
+    expect(fmtRange("2026-10-13", "2026-10-15")).toBe("13 – 15 Oct");
+  });
+
+  it("names both months when the range crosses one", () => {
+    expect(fmtRange("2026-10-30", "2026-11-02")).toBe("30 Oct – 2 Nov");
+    expect(fmtRange("2026-12-30", "2027-01-02")).toBe("30 Dec – 2 Jan");
+  });
+
+  it("shows a single day range as one date", () => {
+    expect(fmtRange("2026-10-13", "2026-10-13")).toBe("13 Oct");
   });
 });

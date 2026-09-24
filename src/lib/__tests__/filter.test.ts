@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Chip, Listing } from "../../data/types.ts";
-import { FEATURED_COUNT, featuredListings, filterListings, type StayMap } from "../filter.ts";
+import { FEATURED_COUNT, featuredListings, filterListings, freeNights, partialNote, splitByStay, type StayMap } from "../filter.ts";
 
 const home = (id: string, over: Partial<Listing> = {}): Listing => ({
   id,
@@ -87,8 +87,8 @@ describe("filterListings — availability for the searched dates", () => {
   const ids = (ls: Listing[]) => ls.map((l) => l.id);
   const stay: StayMap = {
     free: { known: true, available: true, nightly: [200, 200] },
-    booked: { known: true, available: false, reason: "booked" },
-    "short-stay": { known: true, available: false, reason: "min_nights", minNights: 3 },
+    booked: { known: true, available: false, reason: "booked", segments: [] },
+    "short-stay": { known: true, available: false, reason: "min_nights", minNights: 3, segments: [{ from: "2026-10-13", to: "2026-10-15" }] },
     unknown: { known: false },
   };
 
@@ -96,8 +96,13 @@ describe("filterListings — availability for the searched dates", () => {
     expect(ids(filterListings(all, chips, null, "all", stay))).not.toContain("booked");
   });
 
-  it("hides homes whose minimum stay the searched dates don't meet", () => {
-    expect(ids(filterListings(all, chips, null, "all", stay))).not.toContain("short-stay");
+  it("keeps a home whose nights are open but whose minimum stay isn't met — it's a partial match, not a dead end", () => {
+    expect(ids(filterListings(all, chips, null, "all", stay))).toContain("short-stay");
+  });
+
+  it("treats an unavailable result with no segment info as fully booked (older responses)", () => {
+    const old: StayMap = { booked: { known: true, available: false, reason: "booked" } };
+    expect(ids(filterListings([home("booked")], chips, null, "all", old))).toEqual([]);
   });
 
   it("keeps homes that are available", () => {
@@ -117,7 +122,98 @@ describe("filterListings — availability for the searched dates", () => {
 
   it("combines with the destination, guest and chip filters", () => {
     const mixed = [home("a", { town: "Cowes" }), home("b", { town: "Newhaven" }), home("c", { town: "Newhaven" })];
-    const st: StayMap = { b: { known: true, available: false, reason: "booked" }, c: { known: true, available: true } };
+    const st: StayMap = { b: { known: true, available: false, reason: "booked", segments: [] }, c: { known: true, available: true } };
     expect(ids(filterListings(mixed, chips, { dest: "Newhaven", guests: 1 }, "all", st))).toEqual(["c"]);
+  });
+});
+
+describe("splitByStay", () => {
+  const a = home("a"), b = home("b"), c = home("c"), d = home("d"), e = home("e"), f = home("f");
+  const stay: StayMap = {
+    a: { known: true, available: true },
+    b: { known: true, available: false, reason: "booked", segments: [{ from: "2026-10-13", to: "2026-10-14" }] }, // 1 free night
+    c: { known: true, available: false, reason: "booked", segments: [{ from: "2026-10-13", to: "2026-10-16" }] }, // 3 free nights
+    d: { known: true, available: false, reason: "booked", segments: [] }, // nothing free
+    e: { known: false },
+  };
+  const ids = (ls: Listing[]) => ls.map((l) => l.id);
+
+  it("puts homes free for every night in `exact`", () => {
+    expect(ids(splitByStay([a, b, c, d, e, f], stay).exact)).toEqual(["a"]);
+  });
+
+  it("puts homes free for some nights in `partial`, most free nights first", () => {
+    expect(ids(splitByStay([b, c], stay).partial)).toEqual(["c", "b"]);
+  });
+
+  it("leaves fully booked homes out of both", () => {
+    const r = splitByStay([d], stay);
+    expect(r.exact).toEqual([]);
+    expect(r.partial).toEqual([]);
+  });
+
+  it("never calls a home 'exact' unless Guesty confirmed it: unknown / unchecked homes go last in partial", () => {
+    const r = splitByStay([e, b, f], stay);
+    expect(ids(r.exact)).toEqual([]);
+    expect(ids(r.partial)).toEqual(["b", "e", "f"]);
+  });
+
+  it("keeps feed order among homes with the same number of free nights", () => {
+    const tie: StayMap = {
+      x: { known: true, available: false, reason: "booked", segments: [{ from: "2026-10-13", to: "2026-10-15" }] },
+      y: { known: true, available: false, reason: "booked", segments: [{ from: "2026-10-15", to: "2026-10-17" }] },
+    };
+    expect(ids(splitByStay([home("x"), home("y")], tie).partial)).toEqual(["x", "y"]);
+    expect(ids(splitByStay([home("y"), home("x")], tie).partial)).toEqual(["y", "x"]);
+  });
+
+  it("with no search results, everything is `exact` (no sections)", () => {
+    expect(ids(splitByStay([a, b], null).exact)).toEqual(["a", "b"]);
+    expect(splitByStay([a, b], null).partial).toEqual([]);
+  });
+});
+
+describe("freeNights", () => {
+  it("adds up the nights across all free stretches", () => {
+    expect(
+      freeNights({ known: true, available: false, segments: [{ from: "2026-12-26", to: "2026-12-29" }, { from: "2027-01-01", to: "2027-01-02" }] }),
+    ).toBe(4);
+  });
+
+  it("is 0 with no stretches, unknown or missing info", () => {
+    expect(freeNights({ known: true, available: false, segments: [] })).toBe(0);
+    expect(freeNights({ known: false })).toBe(0);
+    expect(freeNights(undefined)).toBe(0);
+  });
+});
+
+describe("partialNote", () => {
+  it("names the free nights and how many of the searched nights they are", () => {
+    const info: StayMap[string] = { known: true, available: false, reason: "booked", segments: [{ from: "2026-10-13", to: "2026-10-15" }] };
+    expect(partialNote(info, 4)).toBe("Free 13 – 15 Oct · 2 of 4 nights");
+  });
+
+  it("lists two separate stretches", () => {
+    const info: StayMap[string] = {
+      known: true, available: false, reason: "booked",
+      segments: [{ from: "2026-12-26", to: "2026-12-29" }, { from: "2027-01-01", to: "2027-01-02" }],
+    };
+    expect(partialNote(info, 7)).toBe("Free 26 – 29 Dec and 1 – 2 Jan · 4 of 7 nights");
+  });
+
+  it("caps a long list of stretches", () => {
+    const seg = (d: number) => ({ from: `2026-11-${String(d).padStart(2, "0")}`, to: `2026-11-${String(d + 1).padStart(2, "0")}` });
+    const info: StayMap[string] = { known: true, available: false, reason: "booked", segments: [seg(2), seg(4), seg(6), seg(8)] };
+    expect(partialNote(info, 8)).toBe("Free 2 – 3 Nov, 4 – 5 Nov and 2 more · 4 of 8 nights");
+  });
+
+  it("explains a minimum-stay refusal instead of pretending the nights are booked", () => {
+    const info: StayMap[string] = { known: true, available: false, reason: "min_nights", minNights: 5, segments: [{ from: "2026-10-23", to: "2026-10-25" }] };
+    expect(partialNote(info, 2)).toBe("Free for your dates, but this home needs a minimum stay of 5 nights");
+  });
+
+  it("says plainly when availability couldn't be confirmed", () => {
+    expect(partialNote({ known: false }, 4)).toBe("Availability couldn't be confirmed for these dates");
+    expect(partialNote(undefined, 4)).toBe("Availability couldn't be confirmed for these dates");
   });
 });

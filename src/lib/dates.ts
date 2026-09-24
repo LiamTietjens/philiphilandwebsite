@@ -43,6 +43,19 @@ export function fmtDay(s: string | null): string {
   return `${DOW[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
 }
 
+/**
+ * A compact date range for notes: "13 – 15 Oct", or "30 Oct – 2 Nov" across a
+ * month boundary. Used for the free stretches of a partly-available home.
+ */
+export function fmtRange(from: string, to: string): string {
+  const a = parseISO(from);
+  const b = parseISO(to);
+  const mon = (d: Date) => MONTHS[d.getMonth()].slice(0, 3);
+  if (from === to) return `${a.getDate()} ${mon(a)}`;
+  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) return `${a.getDate()} – ${b.getDate()} ${mon(b)}`;
+  return `${a.getDate()} ${mon(a)} – ${b.getDate()} ${mon(b)}`;
+}
+
 /** Each night of a stay as YYYY-MM-DD: the arrival day up to, not including, the departure day. */
 export function nightsOf(a: string | null, b: string | null): string[] {
   const n = nightsBetween(a, b);

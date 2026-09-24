@@ -15,6 +15,8 @@ interface Props {
   /** False when availability is unknown — no strike-throughs, and the info
    *  line says so instead of implying every date is free. */
   availabilityKnown?: boolean;
+  /** Month to show first when no check-in is chosen yet (e.g. the month that was searched). */
+  initialMonth?: string | null;
   /** True while availability is still loading — the info line says so. */
   checking?: boolean;
   /** Last day that can be picked. Availability is only known this far ahead, so
@@ -51,14 +53,18 @@ export function RangePicker({
   booked,
   availabilityKnown = true,
   checking = false,
+  initialMonth,
   maxDate,
 }: Props) {
   const panel = usePanel<HTMLDivElement, HTMLDivElement>();
   const [active, setActive] = useState<"in" | "out">("in");
   const [hover, setHover] = useState<string | null>(null);
-  const [view, setView] = useState(() =>
-    checkIn ? new Date(parseISO(checkIn).getFullYear(), parseISO(checkIn).getMonth(), 1) : new Date(TODAY.getFullYear(), TODAY.getMonth(), 1),
-  );
+  const [view, setView] = useState(() => {
+    const anchor = checkIn ?? initialMonth;
+    return anchor
+      ? new Date(parseISO(anchor).getFullYear(), parseISO(anchor).getMonth(), 1)
+      : new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+  });
 
   const monthB = addMonths(view, 1);
   // Stop paging once the second visible month is the last one with known dates.

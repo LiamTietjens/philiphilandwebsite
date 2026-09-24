@@ -410,6 +410,18 @@ body.menu-open .mobile-nav{opacity:1;visibility:visible;transform:none}
 .empty{padding:70px 0;text-align:center;color:var(--muted);display:none}
 .empty.show{display:block}
 
+/* Listing page after a dated search: exact matches, then partial matches. */
+.results-group{margin-top:clamp(40px,4.5vw,64px)}
+.results-group:first-of-type{margin-top:26px}
+.results-group .grid{margin-top:24px}
+.group-title{font-family:'Sentient',serif;font-size:clamp(25px,2.5vw,33px);line-height:1.15;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.group-count{font-family:'Switzer',sans-serif;font-size:13px;letter-spacing:.06em;color:var(--muted)}
+.group-sub{margin-top:8px;max-width:640px;font-size:14.5px;line-height:1.65;color:var(--ink-70);font-weight:300}
+.group-empty{padding:26px 0 8px;color:var(--muted)}
+.card-note,.book-hint{display:block;padding:9px 12px;border-radius:8px;background:var(--sea-tint);color:var(--sea);font-size:12.5px;line-height:1.5}
+.card-note{margin-top:14px}
+.book-hint{margin:0 0 14px;font-size:13px}
+
 /* "Show all N homes" under the landing page's short list. */
 .stays-more{display:flex;justify-content:center;margin-top:clamp(36px,4vw,56px)}
 

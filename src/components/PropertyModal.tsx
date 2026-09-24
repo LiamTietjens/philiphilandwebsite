@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Listing } from "../data/types.ts";
 import { useAvailability } from "../hooks/useAvailability.ts";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll.ts";
-import { buildBookingUrl, buildEnquiryMailto, money, stayCost } from "../lib/booking.ts";
+import { avgNightly, buildBookingUrl, buildEnquiryMailto, money } from "../lib/booking.ts";
 import { nightsOf } from "../lib/dates.ts";
 import { RangePicker } from "./RangePicker.tsx";
 
@@ -17,8 +17,12 @@ interface Props {
   guests: number;
   /** Adults only (guests minus kids), for the Booking Engine's `adults` param. */
   adults: number;
-  /** Dates already chosen in the search bar, so a search carries into the popup. */
+  /** Dates already chosen in the search bar, so a search carries into the popup. Omitted for a partial match. */
   initialStay?: { checkIn: string | null; checkOut: string | null };
+  /** The searched check-in: the calendar opens on its month when no dates are pre-filled. */
+  viewFrom?: string | null;
+  /** A line above the dates, e.g. which nights of the search this home is free. */
+  hint?: string;
   onClose: () => void;
 }
 
@@ -29,7 +33,7 @@ interface Props {
  * days, each night's price, and the minimum stay. If that can't be fetched the
  * popup says so — it never shows a made-up price or implies a date is free.
  */
-export function PropertyModal({ listing, guests, adults, initialStay, onClose }: Props) {
+export function PropertyModal({ listing, guests, adults, initialStay, viewFrom, hint, onClose }: Props) {
   useLockBodyScroll(true);
   const [cur, setCur] = useState(0);
   const [checkIn, setCheckIn] = useState<string | null>(initialStay?.checkIn ?? null);
@@ -54,7 +58,9 @@ export function PropertyModal({ listing, guests, adults, initialStay, onClose }:
   const minStay = checkIn ? availability.minNights[checkIn] : undefined;
   const belowMin = !!minStay && dated && stayNights.length < minStay;
   const blocked = unavailable || belowMin;
-  const quote = blocked ? null : stayCost(listing, checkIn, checkOut, nightly);
+  // Guesty's nightly rates are before fees and taxes; the final price is shown at checkout.
+  const avg = blocked ? null : avgNightly(nightly);
+  const nightlySum = blocked || !nightly ? null : nightly.reduce((a, n) => a + n, 0);
   const priceValues = Object.values(availability.prices);
   const fromPrice = availability.known && priceValues.length ? Math.min(...priceValues) : null;
 
@@ -161,6 +167,7 @@ export function PropertyModal({ listing, guests, adults, initialStay, onClose }:
           )}
 
           <div className="book">
+            {hint && <p className="book-hint">{hint}</p>}
             <div className="book-dates">
               <RangePicker
                 checkIn={checkIn}
@@ -172,6 +179,7 @@ export function PropertyModal({ listing, guests, adults, initialStay, onClose }:
                 booked={availability.booked}
                 availabilityKnown={availability.known}
                 checking={availability.loading}
+                initialMonth={viewFrom}
                 maxDate={availability.horizon ?? undefined}
               />
             </div>
@@ -202,11 +210,11 @@ export function PropertyModal({ listing, guests, adults, initialStay, onClose }:
                 <div className="row">
                   <span>Checking prices…</span>
                 </div>
-              ) : !quote ? (
+              ) : avg === null || nightlySum === null ? (
                 <div className="row">
                   <span>
                     {availability.known
-                      ? "The total for these dates is confirmed when you book"
+                      ? "The price for these dates is shown at checkout"
                       : "We couldn\u2019t check these dates \u2014 we\u2019ll confirm when you book"}
                   </span>
                 </div>
@@ -214,29 +222,13 @@ export function PropertyModal({ listing, guests, adults, initialStay, onClose }:
                 <>
                   <div className="row">
                     <span>
-                      {quote.nights} night{quote.nights === 1 ? "" : "s"}
+                      {stayNights.length} night{stayNights.length === 1 ? "" : "s"} &middot; avg {money(avg, listing.currency)} / night
                     </span>
-                    <span>{money(quote.stay, listing.currency)}</span>
+                    <span>{money(nightlySum, listing.currency)}</span>
                   </div>
-                  {quote.clean > 0 && (
-                    <div className="row">
-                      <span>Cleaning &amp; linen</span>
-                      <span>{money(quote.clean, listing.currency)}</span>
-                    </div>
-                  )}
-                  {quote.disc > 0 && (
-                    <div className="row" style={{ color: "var(--sea)" }}>
-                      <span>Weekly stay discount</span>
-                      <span>&minus;{money(quote.disc, listing.currency)}</span>
-                    </div>
-                  )}
                   <div className="row">
-                    <span>Booking fee</span>
-                    <span style={{ color: "var(--sea)" }}>None</span>
-                  </div>
-                  <div className="row total">
-                    <span>Total</span>
-                    <b>{money(quote.total, listing.currency)}</b>
+                    <span>Fees &amp; taxes</span>
+                    <span>Added at checkout</span>
                   </div>
                 </>
               )}
@@ -265,7 +257,7 @@ export function PropertyModal({ listing, guests, adults, initialStay, onClose }:
                 {requested ? "Request sent" : "Request to book"}
               </a>
             )}
-            <p className="note">Nothing is charged yet. Availability and the final price are confirmed when you book.</p>
+            <p className="note">Nightly rates are shown before fees and taxes. The final price is shown at checkout, and nothing is charged until you book.</p>
           </div>
         </div>
       </div>
