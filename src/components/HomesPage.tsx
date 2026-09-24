@@ -4,10 +4,10 @@ import { useBooking } from "../context/booking.tsx";
 import { useFromPrices, useStaySearch } from "../hooks/useLivePricing.ts";
 import { chipsFor } from "../hooks/useListings.ts";
 import type { ListingsStatus } from "../hooks/useListings.ts";
-import { avgNightly } from "../lib/booking.ts";
-import { fmtDay, fmtRange, nightsBetween } from "../lib/dates.ts";
-import { filterListings, partialNote, splitByStay } from "../lib/filter.ts";
+import { fmtDay } from "../lib/dates.ts";
+import { filterListings, splitByStay } from "../lib/filter.ts";
 import { PropertyCard } from "./PropertyCard.tsx";
+import { StayGroups } from "./StayGroups.tsx";
 
 const backArrow = (
   <svg width="17" height="9" viewBox="0 0 17 9" fill="none">
@@ -42,7 +42,6 @@ export function HomesPage({ listings, status, onOpen }: Props) {
   const checkOut = b.applied?.checkOut ?? null;
   const dated = !!(checkIn && checkOut);
   const range = dated ? `${fmtDay(checkIn)} – ${fmtDay(checkOut)}` : "";
-  const searchedNights = dated ? nightsBetween(checkIn, checkOut) : 0;
 
   const ids = useMemo(() => listings.map((l) => l.id), [listings]);
   const from = useFromPrices(ids);
@@ -78,36 +77,6 @@ export function HomesPage({ listings, status, onOpen }: Props) {
     countText = `Showing ${homes(shownCount)}. We couldn't check availability for ${range}, so dates are confirmed when you book.`;
   else if (shownCount === listings.length) countText = `Showing ${homes(shownCount)}`;
   else countText = `Showing ${shownCount} of ${listings.length} homes`;
-
-  /** An exact match: free every night, popup opens with the dates filled in. */
-  const exactCard = (l: Listing, i: number) => {
-    const avg = avgNightly(search.stay?.[l.id]?.nightly);
-    return (
-      <PropertyCard
-        key={l.id}
-        listing={l}
-        index={i}
-        onOpen={() => onOpen(l, { prefill: true })}
-        from={from[l.id]}
-        stay={avg !== null ? { nights: searchedNights, avgNightly: avg } : null}
-      />
-    );
-  };
-
-  /** A partial match: says which nights are free; popup opens without dates. */
-  const partialCard = (l: Listing, i: number) => {
-    const note = partialNote(search.stay?.[l.id], searchedNights);
-    return (
-      <PropertyCard
-        key={l.id}
-        listing={l}
-        index={i}
-        note={note}
-        onOpen={() => onOpen(l, { prefill: false, hint: `You searched ${fmtRange(checkIn!, checkOut!)}. ${note}.` })}
-        from={from[l.id]}
-      />
-    );
-  };
 
   return (
     <section className="sec homes-page" id="homes">
@@ -159,34 +128,7 @@ export function HomesPage({ listings, status, onOpen }: Props) {
 
         {split ? (
           <>
-            <div className="results-group" id="group-exact">
-              <h2 className="group-title">
-                Available for your exact dates <span className="group-count">{split.exact.length}</span>
-              </h2>
-              <p className="group-sub">Free every night from {range}. Open one and your dates are already filled in.</p>
-              {split.exact.length > 0 ? (
-                <div className="grid" id="grid">
-                  {split.exact.map(exactCard)}
-                </div>
-              ) : (
-                <p className="group-empty">No home is free for every night of {range}.</p>
-              )}
-            </div>
-
-            {split.partial.length > 0 && (
-              <div className="results-group" id="group-partial">
-                <h2 className="group-title">
-                  Available for part of your dates <span className="group-count">{split.partial.length}</span>
-                </h2>
-                <p className="group-sub">
-                  These homes are free for some of the nights you searched, not all of them. Open one to pick dates that
-                  work.
-                </p>
-                <div className="grid" id="grid-partial">
-                  {split.partial.map(partialCard)}
-                </div>
-              </div>
-            )}
+            <StayGroups split={split} stay={search.stay} checkIn={checkIn!} checkOut={checkOut!} from={from} onOpen={onOpen} />
 
             <p className={`empty${shownCount === 0 ? " show" : ""}`} id="empty">
               No homes are free for any of those nights. Try different dates.
