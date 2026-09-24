@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Chip, Listing } from "../../data/types.ts";
-import { FEATURED_COUNT, featuredListings, filterListings, freeNights, partialNote, splitByStay, type StayMap } from "../filter.ts";
+import { FEATURED_COUNT, featuredListings, filterListings, freeNights, partialNote, splitByStay, splitCountText, type StayMap } from "../filter.ts";
 
 const home = (id: string, over: Partial<Listing> = {}): Listing => ({
   id,
@@ -152,10 +152,11 @@ describe("splitByStay", () => {
     expect(r.partial).toEqual([]);
   });
 
-  it("never calls a home 'exact' unless Guesty confirmed it: unknown / unchecked homes go last in partial", () => {
+  it("only lists homes Guesty confirmed: unknown / unchecked homes are in neither section", () => {
     const r = splitByStay([e, b, f], stay);
     expect(ids(r.exact)).toEqual([]);
-    expect(ids(r.partial)).toEqual(["b", "e", "f"]);
+    expect(ids(r.partial)).toEqual(["b"]);
+    expect(ids(r.unconfirmed)).toEqual(["e", "f"]);
   });
 
   it("keeps feed order among homes with the same number of free nights", () => {
@@ -170,6 +171,7 @@ describe("splitByStay", () => {
   it("with no search results, everything is `exact` (no sections)", () => {
     expect(ids(splitByStay([a, b], null).exact)).toEqual(["a", "b"]);
     expect(splitByStay([a, b], null).partial).toEqual([]);
+    expect(splitByStay([a, b], null).unconfirmed).toEqual([]);
   });
 });
 
@@ -215,5 +217,23 @@ describe("partialNote", () => {
   it("says plainly when availability couldn't be confirmed", () => {
     expect(partialNote({ known: false }, 4)).toBe("Availability couldn't be confirmed for these dates");
     expect(partialNote(undefined, 4)).toBe("Availability couldn't be confirmed for these dates");
+  });
+});
+
+describe("splitCountText", () => {
+  it("names both sections with their counts", () => {
+    expect(splitCountText(76, 22)).toBe("76 exact matches · 22 alternatives");
+  });
+
+  it("uses the singular for one", () => {
+    expect(splitCountText(1, 1)).toBe("1 exact match · 1 alternative");
+  });
+
+  it("says so plainly when there are no exact matches", () => {
+    expect(splitCountText(0, 7)).toBe("0 exact matches · 7 alternatives");
+  });
+
+  it("leaves out the alternatives when there are none", () => {
+    expect(splitCountText(5, 0)).toBe("5 exact matches");
   });
 });

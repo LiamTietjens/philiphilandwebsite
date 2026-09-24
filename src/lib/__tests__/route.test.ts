@@ -4,7 +4,7 @@ import { HOMES_HASH, homesHash, parseHomesSearch, parseRoute, sameSearch } from 
 describe("the search in the listing page's URL", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 8, 24, 12, 0, 0)); // 24 Sep 2026, local
+    vi.setSystemTime(new Date("2026-09-24T02:00:00Z")); // noon on 24 Sep 2026 in Melbourne
   });
   afterEach(() => vi.useRealTimers());
 

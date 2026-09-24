@@ -75,18 +75,20 @@ export function freeNights(info: StayInfo | undefined): number {
 export interface StaySplit {
   /** Free for every night of the searched dates. */
   exact: Listing[];
-  /** Free for only some of them (most free nights first), then any Guesty couldn't confirm. */
+  /** Free for only some of them, most free nights first. */
   partial: Listing[];
+  /** Guesty gave no answer for these, so they are listed in neither section. */
+  unconfirmed: Listing[];
 }
 
 /**
  * Split the (already filtered) homes into the two result sections. Homes with no
- * free night are left out of both. Without search results everything is `exact`
- * — there are no sections to show. A home is only ever called "exact" when
- * Guesty confirmed it: unknown or unchecked homes go to the end of `partial`.
+ * free night are left out of both, and so are homes Guesty gave no answer for
+ * (`unconfirmed`): a dated search only lists homes confirmed free. Without
+ * search results everything is `exact` — there are no sections to show.
  */
 export function splitByStay(listings: Listing[], stay: StayMap | null): StaySplit {
-  if (!stay) return { exact: listings, partial: [] };
+  if (!stay) return { exact: listings, partial: [], unconfirmed: [] };
 
   const exact: Listing[] = [];
   const someFree: { l: Listing; nights: number; i: number }[] = [];
@@ -101,7 +103,13 @@ export function splitByStay(listings: Listing[], stay: StayMap | null): StaySpli
   });
 
   someFree.sort((a, b) => b.nights - a.nights || a.i - b.i);
-  return { exact, partial: [...someFree.map((x) => x.l), ...unconfirmed] };
+  return { exact, partial: someFree.map((x) => x.l), unconfirmed };
+}
+
+/** The results count line for a dated search: "76 exact matches · 22 alternatives". */
+export function splitCountText(exact: number, partial: number): string {
+  const e = `${exact} exact ${exact === 1 ? "match" : "matches"}`;
+  return partial > 0 ? `${e} · ${partial} ${partial === 1 ? "alternative" : "alternatives"}` : e;
 }
 
 /** The line on a partial-match card saying what is (and isn't) free. */

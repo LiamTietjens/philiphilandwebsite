@@ -5,10 +5,10 @@ import { useFromPrices, useStaySearch } from "../hooks/useLivePricing.ts";
 import { chipsFor } from "../hooks/useListings.ts";
 import type { ListingsStatus } from "../hooks/useListings.ts";
 import { fmtDay } from "../lib/dates.ts";
-import { filterListings, splitByStay } from "../lib/filter.ts";
+import { filterListings, splitByStay, splitCountText } from "../lib/filter.ts";
 import { HOMES_HASH } from "../lib/route.ts";
 import { PropertyCard } from "./PropertyCard.tsx";
-import { StayGroups } from "./StayGroups.tsx";
+import { CheckFailed, StayGroups } from "./StayGroups.tsx";
 
 const backArrow = (
   <svg width="17" height="9" viewBox="0 0 17 9" fill="none">
@@ -49,8 +49,10 @@ export function HomesPage({ listings, status, onOpen }: Props) {
   const search = useStaySearch(ids, checkIn, checkOut);
   const checking = dated && search.status === "loading";
   const ready = dated && search.status === "ready";
+  // Dates are chosen but Guesty couldn't be asked: list nothing rather than homes that may be booked.
+  const failed = dated && search.status === "error";
 
-  const filtered = checking ? [] : filterListings(listings, chips, b.applied, chip, ready ? search.stay : null);
+  const filtered = checking || failed ? [] : filterListings(listings, chips, b.applied, chip, ready ? search.stay : null);
   const split = ready ? splitByStay(filtered, search.stay) : null;
   const shownCount = split ? split.exact.length + split.partial.length : filtered.length;
 
@@ -71,11 +73,9 @@ export function HomesPage({ listings, status, onOpen }: Props) {
     countText =
       shownCount === 0
         ? "No homes available"
-        : `${homes(split.exact.length)} available for your exact dates` +
-          (split.partial.length ? ` · ${homes(split.partial.length)} for part of them` : "");
-  } else if (shownCount === 0) countText = "No homes match";
-  else if (dated && search.status === "error")
-    countText = `Showing ${homes(shownCount)}. We couldn't check availability for ${range}, so dates are confirmed when you book.`;
+        : splitCountText(split.exact.length, split.partial.length);
+  } else if (failed) countText = `We couldn't check availability for ${range}.`;
+  else if (shownCount === 0) countText = "No homes match";
   else if (shownCount === listings.length) countText = `Showing ${homes(shownCount)}`;
   else countText = `Showing ${shownCount} of ${listings.length} homes`;
 
@@ -89,10 +89,11 @@ export function HomesPage({ listings, status, onOpen }: Props) {
         <div className="sec-head rv">
           <div className="txt">
             <span className="eyebrow">Our houses</span>
-            <h1 className="serif d2">All our homes.</h1>
+            <h1 className="serif d2">{dated ? "Homes for your dates." : "All our homes."}</h1>
             <p className="lede">
-              Every house we look after across Phillip Island and San Remo. Filter by town or feature, or pick
-              dates to see which homes are free for them.
+              {dated
+                ? `Only homes that are free for ${range} are listed: exact matches first, then alternatives that are free for part of your stay.`
+                : "Every house we look after across Phillip Island and San Remo. Filter by town or feature, or pick dates to see which homes are free for them."}
             </p>
           </div>
         </div>
@@ -139,7 +140,7 @@ export function HomesPage({ listings, status, onOpen }: Props) {
             <a href="#search" className="link-u" style={{ color: "var(--sea)" }}>
               Choose your dates
             </a>{" "}
-            and we&rsquo;ll show the homes free for exactly those nights first, then alternatives free for only part of your stay.
+            and we&rsquo;ll show the exact matches first, then alternatives that are free for part of your stay.
           </p>
         )}
 
@@ -151,6 +152,8 @@ export function HomesPage({ listings, status, onOpen }: Props) {
               No homes are free for any of those nights. Try different dates.
             </p>
           </>
+        ) : failed ? (
+          <CheckFailed range={range} onRetry={search.retry} />
         ) : (
           <>
             <div className="grid" id="grid">
