@@ -17,6 +17,21 @@ interface Props {
   limit?: number;
 }
 
+/** Shown instead of a list when Guesty couldn't be asked: no home is listed that hasn't been confirmed free. */
+export function CheckFailed({ range, onRetry }: { range: string; onRetry: () => void }) {
+  return (
+    <div className="check-failed" role="alert">
+      <p>
+        We couldn&rsquo;t check which homes are free for {range}. Please try again, or call us on{" "}
+        <a href="tel:+61490465855">+61 490 465 855</a>.
+      </p>
+      <button type="button" className="btn" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  );
+}
+
 /**
  * The two result sections for a dated search, shared by the landing page and
  * the listing page: homes free for the EXACT dates (popup opens with the dates
@@ -34,9 +49,9 @@ export function StayGroups({ split, stay, checkIn, checkOut, from, onOpen, limit
     <>
       <div className="results-group" id="group-exact">
         <h2 className="group-title">
-          Available for your exact dates <span className="group-count">{split.exact.length}</span>
+          Exact matches <span className="group-count">{split.exact.length}</span>
         </h2>
-        <p className="group-sub">Free every night from {range}. Open one and your dates are already filled in.</p>
+        <p className="group-sub">Free every night, {range}. Open one and your dates are already filled in.</p>
         {exact.length > 0 ? (
           <div className="grid" id="grid">
             {exact.map((l: Listing, i) => {
@@ -54,17 +69,20 @@ export function StayGroups({ split, stay, checkIn, checkOut, from, onOpen, limit
             })}
           </div>
         ) : (
-          <p className="group-empty">No home is free for every night of {range}.</p>
+          <p className="group-empty">
+            No exact matches: no home is free for every night of {range}.
+            {split.partial.length > 0 && " See the alternatives below."}
+          </p>
         )}
       </div>
 
       {partial.length > 0 && (
         <div className="results-group" id="group-partial">
           <h2 className="group-title">
-            Available for part of your dates <span className="group-count">{split.partial.length}</span>
+            Alternatives <span className="group-count">{split.partial.length}</span>
           </h2>
           <p className="group-sub">
-            These homes are free for some of the nights you searched, not all of them. Open one to pick dates that work.
+            Not free for all of {range}, but free for some of those nights. Open one to pick dates that work.
           </p>
           <div className="grid" id="grid-partial">
             {partial.map((l: Listing, i) => {
@@ -82,6 +100,13 @@ export function StayGroups({ split, stay, checkIn, checkOut, from, onOpen, limit
             })}
           </div>
         </div>
+      )}
+
+      {split.unconfirmed.length > 0 && (
+        <p className="group-sub">
+          {split.unconfirmed.length} {split.unconfirmed.length === 1 ? "home" : "homes"} couldn&rsquo;t be checked just now, so{" "}
+          {split.unconfirmed.length === 1 ? "it isn\u2019t" : "they aren\u2019t"} listed. Refresh the page to try again.
+        </p>
       )}
     </>
   );

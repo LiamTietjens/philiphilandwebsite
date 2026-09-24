@@ -1,5 +1,43 @@
-import { describe, expect, it } from "vitest";
-import { addMonths, fmtDay, iso, monthShape, fmtRange, nightsBetween, nightsOf, parseISO } from "../dates.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { addMonths, fmtDay, iso, monthShape, fmtRange, nightsBetween, nightsOf, parseISO, searchHorizon, today } from "../dates.ts";
+
+describe("today / searchHorizon use the island's calendar day, not the visitor's", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("is already tomorrow on the island while it is still evening in Europe or India", () => {
+    // 24 Sep 15:51 UTC = 25 Sep 01:51 in Melbourne. The server rejects 24 Sep as "in the past".
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T15:51:00Z"));
+    expect(iso(today())).toBe("2026-09-25");
+  });
+
+  it("is still yesterday on the island late in the evening in the Americas", () => {
+    // 24 Sep 13:00 UTC = 24 Sep 23:00 in Melbourne (before DST) — not the 25th.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T13:00:00Z"));
+    expect(iso(today())).toBe("2026-09-24");
+  });
+
+  it("follows daylight saving (UTC+11 from the first Sunday of October)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-10T13:30:00Z")); // 00:30 on 11 Oct in Melbourne
+    expect(iso(today())).toBe("2026-10-11");
+  });
+
+  it("returns local midnight, so it works with the rest of the date helpers", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T15:51:00Z"));
+    const t = today();
+    expect([t.getHours(), t.getMinutes(), t.getSeconds()]).toEqual([0, 0, 0]);
+  });
+
+  it("the search horizon is 360 days after the island's today (inside the server's 365)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T15:51:00Z"));
+    expect(searchHorizon()).toBe("2027-09-20");
+  });
+});
+
 
 describe("iso / parseISO", () => {
   it("round-trips a local date without a UTC day shift", () => {

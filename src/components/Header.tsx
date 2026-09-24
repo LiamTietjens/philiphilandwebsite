@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Wordmark } from "./Wordmark.tsx";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll.ts";
-import { HOMES_HASH } from "../lib/route.ts";
+import { useBooking } from "../context/booking.tsx";
 
-const NAV = [
-  { href: HOMES_HASH, label: "Stays" },
+/** "Stays" opens the listing page, carrying any dates already picked in the search bar. */
+const navFor = (homesHref: string) => [
+  { href: homesHref, label: "Stays" },
   { href: "#story", label: "Our Island" },
   { href: "#included", label: "Included" },
   { href: "#guide", label: "Guide" },
@@ -21,6 +22,8 @@ const EMAIL = "phillipislandcohost@gmail.com";
  * jump to top:0 and cover it.
  */
 export function Header({ onPage = false }: { onPage?: boolean }) {
+  const b = useBooking();
+  const NAV = navFor(b.homesHref);
   const [solid, setSolid] = useState(false);
   const [open, setOpen] = useState(false);
   useLockBodyScroll(open);

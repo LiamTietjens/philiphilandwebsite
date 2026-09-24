@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useBooking } from "../context/booking.tsx";
 import { usePanel } from "../hooks/usePanel.ts";
 import { searchHorizon } from "../lib/dates.ts";
-import { HOMES_HASH } from "../lib/route.ts";
+import { homesHash } from "../lib/route.ts";
 import { RangePicker } from "./RangePicker.tsx";
 
 const pinSVG = (
@@ -48,7 +48,7 @@ export function SearchBar() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     b.apply();
-    window.location.hash = HOMES_HASH;
+    window.location.hash = homesHash({ dest: b.dest, guests: b.guests, checkIn: b.checkIn, checkOut: b.checkOut });
   }
 
   return (

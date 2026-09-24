@@ -324,6 +324,7 @@ body.menu-open .mobile-nav{opacity:1;visibility:visible;transform:none}
 }
 .dp-d.is-off:hover::before{background:none}
 .dp-d.is-today span{font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.dp-d.is-today.is-booked span{text-decoration:line-through;text-decoration-thickness:1px}
 .dp-d.is-mid{background:var(--sea-tint)}
 .dp-d.is-in{background:linear-gradient(90deg,transparent 50%,var(--sea-tint) 50%)}
 .dp-d.is-out{background:linear-gradient(90deg,var(--sea-tint) 50%,transparent 50%)}
@@ -418,6 +419,9 @@ body.menu-open .mobile-nav{opacity:1;visibility:visible;transform:none}
 .group-count{font-family:'Switzer',sans-serif;font-size:13px;letter-spacing:.06em;color:var(--muted)}
 .group-sub{margin-top:8px;max-width:640px;font-size:14.5px;line-height:1.65;color:var(--ink-70);font-weight:300}
 .group-empty{padding:26px 0 8px;color:var(--muted)}
+.check-failed{margin-top:26px;max-width:640px}
+.check-failed p{font-size:15px;line-height:1.65;color:var(--ink-70);font-weight:300;margin-bottom:18px}
+.check-failed a{color:var(--sea);text-decoration:underline}
 .card-note,.book-hint{display:block;padding:9px 12px;border-radius:8px;background:var(--sea-tint);color:var(--sea);font-size:12.5px;line-height:1.5}
 .card-note{margin-top:14px}
 .book-hint{margin:0 0 14px;font-size:13px}

@@ -1,3 +1,4 @@
+import { useBooking } from "../context/booking.tsx";
 import { HOMES_HASH } from "../lib/route.ts";
 import { Wordmark } from "./Wordmark.tsx";
 
@@ -5,6 +6,7 @@ const PHONE = "+61 490 465 855";
 const EMAIL = "phillipislandcohost@gmail.com";
 
 export function Footer() {
+  const b = useBooking();
   return (
     <footer className="ft">
       <div className="wrap">
@@ -21,7 +23,7 @@ export function Footer() {
             <h4>Stay</h4>
             <ul>
               <li>
-                <a href={HOMES_HASH}>All homes</a>
+                <a href={b.homesHref}>All homes</a>
               </li>
               <li>
                 <a href={HOMES_HASH}>Cowes</a>

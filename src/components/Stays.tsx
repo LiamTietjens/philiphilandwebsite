@@ -4,10 +4,9 @@ import { useBooking } from "../context/booking.tsx";
 import type { ListingsStatus } from "../hooks/useListings.ts";
 import { useFromPrices, useStaySearch } from "../hooks/useLivePricing.ts";
 import { fmtDay } from "../lib/dates.ts";
-import { FEATURED_COUNT, featuredListings, filterListings, splitByStay } from "../lib/filter.ts";
-import { HOMES_HASH } from "../lib/route.ts";
+import { FEATURED_COUNT, featuredListings, filterListings, splitByStay, splitCountText } from "../lib/filter.ts";
 import { PropertyCard } from "./PropertyCard.tsx";
-import { StayGroups } from "./StayGroups.tsx";
+import { CheckFailed, StayGroups } from "./StayGroups.tsx";
 
 const arrow = (
   <svg width="17" height="9" viewBox="0 0 17 9" fill="none">
@@ -28,7 +27,7 @@ interface Props {
  * Once both dates are picked in the search bar, this list stops being a fixed
  * five and becomes a preview of what Search would show: Guesty is asked about
  * every home for those dates and the list splits into homes free for the exact
- * dates and homes free for only part of them. Fully booked homes are left out,
+ * dates (exact matches) and homes free for only part of them (alternatives). Fully booked homes are left out,
  * so a card never opens on dates that aren't available.
  */
 export function Stays({ listings, status, onOpen }: Props) {
@@ -40,6 +39,7 @@ export function Stays({ listings, status, onOpen }: Props) {
   const search = useStaySearch(ids, b.checkIn, b.checkOut);
   const checking = dated && search.status === "loading";
   const ready = dated && search.status === "ready";
+  const failed = dated && search.status === "error";
 
   // Destination and guests count too, exactly as they will once Search is pressed.
   const draft = { dest: b.dest, guests: b.guests, checkIn: b.checkIn, checkOut: b.checkOut };
@@ -48,7 +48,7 @@ export function Stays({ listings, status, onOpen }: Props) {
   const featured = featuredListings(listings);
   const visible = split
     ? [...split.exact.slice(0, FEATURED_COUNT), ...split.partial.slice(0, FEATURED_COUNT)]
-    : checking
+    : checking || failed
       ? []
       : featured;
   // Real prices from Guesty's calendar, only for the homes actually on screen.
@@ -64,16 +64,14 @@ export function Stays({ listings, status, onOpen }: Props) {
     countText =
       split.exact.length + split.partial.length === 0
         ? `No homes available for ${range}`
-        : `${homes(split.exact.length)} available for your exact dates` +
-          (split.partial.length ? ` · ${homes(split.partial.length)} for part of them` : "");
-  } else if (dated && search.status === "error")
-    countText = `Showing ${featured.length} of ${listings.length} homes. We couldn't check availability for ${range}, so dates are confirmed when you book.`;
+        : splitCountText(split.exact.length, split.partial.length);
+  } else if (failed) countText = `We couldn't check availability for ${range}.`;
   else if (listings.length > featured.length) countText = `Showing ${featured.length} of ${listings.length} homes`;
   else countText = `Showing ${homes(featured.length)}`;
 
   const hasMore = split
     ? split.exact.length > FEATURED_COUNT || split.partial.length > FEATURED_COUNT
-    : !checking && listings.length > featured.length;
+    : !checking && !failed && listings.length > featured.length;
 
   return (
     <section className="sec" id="stays">
@@ -106,6 +104,8 @@ export function Stays({ listings, status, onOpen }: Props) {
             onOpen={onOpen}
             limit={FEATURED_COUNT}
           />
+        ) : failed ? (
+          <CheckFailed range={range} onRetry={search.retry} />
         ) : (
           <div className="grid" id="grid">
             {visible.map((l, i) => (
@@ -116,8 +116,7 @@ export function Stays({ listings, status, onOpen }: Props) {
 
         {hasMore && (
           <div className="stays-more rv">
-            {/* With dates, carry the whole search (dates, guests, town) through to the full list. */}
-            <a href={HOMES_HASH} className="btn" onClick={split ? () => b.apply() : undefined}>
+            <a href={b.homesHref} className="btn">
               {split
                 ? `See all ${split.exact.length + split.partial.length} homes for these dates`
                 : `Show all ${listings.length} homes`}{" "}

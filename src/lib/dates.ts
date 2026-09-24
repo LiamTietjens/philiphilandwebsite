@@ -19,10 +19,21 @@ export const parseISO = (s: string): Date => {
   return new Date(y, m - 1, d);
 };
 
-export function today(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+/** The homes are on Phillip Island, and Guesty's availability window starts on the island's today. */
+const ISLAND_TZ = "Australia/Melbourne";
+
+/**
+ * Today's calendar day ON THE ISLAND, as a local-midnight Date. Not the
+ * visitor's own day: while it is evening in Europe or India the island is
+ * already tomorrow, and offering the visitor "today" then asks Guesty about a
+ * night that is in the past there (the server answers 422 outside_window).
+ */
+export function today(now: Date = new Date()): Date {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: ISLAND_TZ, year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(now)
+    .split("-")
+    .map(Number);
+  return new Date(y, m - 1, d);
 }
 
 /**

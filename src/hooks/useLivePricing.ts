@@ -83,6 +83,8 @@ export interface StaySearch {
   /** idle: no dates · loading · ready: Guesty answered · error: couldn't check (nothing may be hidden or priced). */
   status: "idle" | "loading" | "ready" | "error";
   stay: StayMap | null;
+  /** Ask Guesty again after an error. */
+  retry: () => void;
 }
 
 const staySearchCache = new Map<string, StayMap>();
@@ -93,12 +95,15 @@ const staySearchCache = new Map<string, StayMap>();
  */
 export function useStaySearch(ids: string[], checkIn: string | null, checkOut: string | null): StaySearch {
   const cacheKey = checkIn && checkOut && ids.length ? `${checkIn}|${checkOut}|${ids.join(",")}` : null;
+  const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; state: "ready" | "error"; stay: StayMap | null } | null>(null);
+  const retry = () => setAttempt((n) => n + 1);
+  const resultKey = cacheKey ? `${cacheKey}#${attempt}` : null;
 
   useEffect(() => {
     if (!cacheKey || !checkIn || !checkOut) return;
     if (staySearchCache.has(cacheKey)) {
-      setResult({ key: cacheKey, state: "ready", stay: staySearchCache.get(cacheKey)! });
+      setResult({ key: resultKey!, state: "ready", stay: staySearchCache.get(cacheKey)! });
       return;
     }
     const ctrl = new AbortController();
@@ -111,17 +116,17 @@ export function useStaySearch(ids: string[], checkIn: string | null, checkOut: s
           Object.assign(stay, data.listings);
         }
         staySearchCache.set(cacheKey, stay);
-        setResult({ key: cacheKey, state: "ready", stay });
+        setResult({ key: resultKey!, state: "ready", stay });
       } catch {
-        if (!ctrl.signal.aborted) setResult({ key: cacheKey, state: "error", stay: null });
+        if (!ctrl.signal.aborted) setResult({ key: resultKey!, state: "error", stay: null });
       }
     })();
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey]);
+  }, [cacheKey, attempt]);
 
-  if (!cacheKey) return { status: "idle", stay: null };
-  // A result for different dates is stale — treat as loading until the new one lands.
-  if (!result || result.key !== cacheKey) return { status: "loading", stay: null };
-  return { status: result.state, stay: result.stay };
+  if (!cacheKey) return { status: "idle", stay: null, retry };
+  // A result for different dates (or an earlier attempt) is stale — treat as loading until the new one lands.
+  if (!result || result.key !== resultKey) return { status: "loading", stay: null, retry };
+  return { status: result.state, stay: result.stay, retry };
 }
