@@ -6,6 +6,7 @@ import { chipsFor } from "../hooks/useListings.ts";
 import type { ListingsStatus } from "../hooks/useListings.ts";
 import { fmtDay } from "../lib/dates.ts";
 import { filterListings, splitByStay } from "../lib/filter.ts";
+import { HOMES_HASH } from "../lib/route.ts";
 import { PropertyCard } from "./PropertyCard.tsx";
 import { StayGroups } from "./StayGroups.tsx";
 
@@ -103,7 +104,14 @@ export function HomesPage({ listings, status, onOpen }: Props) {
               Change search
             </a>
             {b.applied && (
-              <button type="button" className="link-u" onClick={() => b.set({ applied: null })}>
+              <button
+                type="button"
+                className="link-u"
+                onClick={() => {
+                  b.set({ applied: null, checkIn: null, checkOut: null });
+                  window.location.hash = HOMES_HASH;
+                }}
+              >
                 Clear
               </button>
             )}
@@ -125,6 +133,15 @@ export function HomesPage({ listings, status, onOpen }: Props) {
         <p className="count" id="count">
           {countText}
         </p>
+        {!dated && status === "ready" && (
+          <p className="group-sub">
+            Looking for particular dates?{" "}
+            <a href="#search" className="link-u" style={{ color: "var(--sea)" }}>
+              Choose your dates
+            </a>{" "}
+            and we&rsquo;ll show the homes free for exactly those nights first, then alternatives free for only part of your stay.
+          </p>
+        )}
 
         {split ? (
           <>

@@ -5,7 +5,6 @@ import type { ListingsStatus } from "../hooks/useListings.ts";
 import { useFromPrices, useStaySearch } from "../hooks/useLivePricing.ts";
 import { fmtDay } from "../lib/dates.ts";
 import { FEATURED_COUNT, featuredListings, filterListings, splitByStay } from "../lib/filter.ts";
-import { HOMES_HASH } from "../lib/route.ts";
 import { PropertyCard } from "./PropertyCard.tsx";
 import { StayGroups } from "./StayGroups.tsx";
 
@@ -116,8 +115,7 @@ export function Stays({ listings, status, onOpen }: Props) {
 
         {hasMore && (
           <div className="stays-more rv">
-            {/* With dates, carry the whole search (dates, guests, town) through to the full list. */}
-            <a href={HOMES_HASH} className="btn" onClick={split ? () => b.apply() : undefined}>
+            <a href={b.homesHref} className="btn">
               {split
                 ? `See all ${split.exact.length + split.partial.length} homes for these dates`
                 : `Show all ${listings.length} homes`}{" "}
