@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Listing } from "../data/types.ts";
 import { useAvailability } from "../hooks/useAvailability.ts";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll.ts";
-import { buildBookingUrl, buildEnquiryMailto, money, stayCost } from "../lib/booking.ts";
+import { avgNightly, buildBookingUrl, buildEnquiryMailto, money } from "../lib/booking.ts";
+import { nightsOf } from "../lib/dates.ts";
 import { RangePicker } from "./RangePicker.tsx";
 
 const checkSVG = (
@@ -14,20 +15,29 @@ const checkSVG = (
 interface Props {
   listing: Listing;
   guests: number;
+  /** Adults only (guests minus kids), for the Booking Engine's `adults` param. */
+  adults: number;
+  /** Dates already chosen in the search bar, so a search carries into the popup. Omitted for a partial match. */
+  initialStay?: { checkIn: string | null; checkOut: string | null };
+  /** The searched check-in: the calendar opens on its month when no dates are pre-filled. */
+  viewFrom?: string | null;
+  /** A line above the dates, e.g. which nights of the search this home is free. */
+  hint?: string;
   onClose: () => void;
 }
 
 /**
  * Matches the prototype's `.modal` markup: a photo gallery on the left, a
- * details + booking rail on the right. Availability comes from
- * useAvailability() for this specific listing, degrading to "unknown" (no
- * strike-throughs) rather than the prototype's seeded fake bookings.
+ * details + booking rail on the right. Everything date- and price-related
+ * comes from Guesty's calendar for this listing (useAvailability): the booked
+ * days, each night's price, and the minimum stay. If that can't be fetched the
+ * popup says so — it never shows a made-up price or implies a date is free.
  */
-export function PropertyModal({ listing, guests, onClose }: Props) {
+export function PropertyModal({ listing, guests, adults, initialStay, viewFrom, hint, onClose }: Props) {
   useLockBodyScroll(true);
   const [cur, setCur] = useState(0);
-  const [checkIn, setCheckIn] = useState<string | null>(null);
-  const [checkOut, setCheckOut] = useState<string | null>(null);
+  const [checkIn, setCheckIn] = useState<string | null>(initialStay?.checkIn ?? null);
+  const [checkOut, setCheckOut] = useState<string | null>(initialStay?.checkOut ?? null);
   const [requested, setRequested] = useState(false);
   const bgRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -35,7 +45,24 @@ export function PropertyModal({ listing, guests, onClose }: Props) {
 
   const availability = useAvailability(listing.id);
   const photos = listing.photos;
-  const quote = stayCost(listing, checkIn, checkOut);
+
+  const stayNights = nightsOf(checkIn, checkOut);
+  const dated = stayNights.length > 0;
+  const nightly =
+    availability.known && dated && stayNights.every((d) => availability.prices[d] !== undefined)
+      ? stayNights.map((d) => availability.prices[d])
+      : undefined;
+  // The chosen dates may have been carried in from the search bar, so check
+  // them against this home's own calendar rather than assuming they're free.
+  const unavailable = availability.known && stayNights.some((d) => availability.booked.has(d));
+  const minStay = checkIn ? availability.minNights[checkIn] : undefined;
+  const belowMin = !!minStay && dated && stayNights.length < minStay;
+  const blocked = unavailable || belowMin;
+  // Guesty's nightly rates are before fees and taxes; the final price is shown at checkout.
+  const avg = blocked ? null : avgNightly(nightly);
+  const nightlySum = blocked || !nightly ? null : nightly.reduce((a, n) => a + n, 0);
+  const priceValues = Object.values(availability.prices);
+  const fromPrice = availability.known && priceValues.length ? Math.min(...priceValues) : null;
 
   // The scrim animates its own blur. Adding the "on" class in the same paint
   // as mount collapses the transition to nothing, because the browser
@@ -72,7 +99,7 @@ export function PropertyModal({ listing, guests, onClose }: Props) {
     strip.scrollTo({ left: strip.scrollLeft + (r.left - s.left) - (s.width - r.width) / 2, behavior: "smooth" });
   }, [cur]);
 
-  const query = { listingId: listing.id, name: listing.name, checkIn: checkIn ?? undefined, checkOut: checkOut ?? undefined, guests };
+  const query = { listingId: listing.id, name: listing.name, checkIn: checkIn ?? undefined, checkOut: checkOut ?? undefined, guests, adults };
   const bookUrl = buildBookingUrl(query);
 
   return (
@@ -140,6 +167,7 @@ export function PropertyModal({ listing, guests, onClose }: Props) {
           )}
 
           <div className="book">
+            {hint && <p className="book-hint">{hint}</p>}
             <div className="book-dates">
               <RangePicker
                 checkIn={checkIn}
@@ -150,47 +178,71 @@ export function PropertyModal({ listing, guests, onClose }: Props) {
                 }}
                 booked={availability.booked}
                 availabilityKnown={availability.known}
+                checking={availability.loading}
+                initialMonth={viewFrom}
+                maxDate={availability.horizon ?? undefined}
               />
             </div>
             <div className="book-sum">
-              {!quote ? (
+              {!dated ? (
                 <div className="row">
-                  <span>{money(listing.price, listing.currency)} a night</span>
+                  <span>
+                    {availability.loading
+                      ? "Loading prices…"
+                      : fromPrice !== null
+                        ? `From ${money(fromPrice, listing.currency)} a night`
+                        : "Price on request"}
+                  </span>
                   <span>Add dates for a total</span>
+                </div>
+              ) : unavailable ? (
+                <div className="row">
+                  <span>Not available for these dates</span>
+                  <span>Try other dates</span>
+                </div>
+              ) : belowMin ? (
+                <div className="row">
+                  <span>
+                    Minimum stay for this arrival date is {minStay} nights
+                  </span>
+                </div>
+              ) : availability.loading ? (
+                <div className="row">
+                  <span>Checking prices…</span>
+                </div>
+              ) : avg === null || nightlySum === null ? (
+                <div className="row">
+                  <span>
+                    {availability.known
+                      ? "The price for these dates is shown at checkout"
+                      : "We couldn\u2019t check these dates \u2014 we\u2019ll confirm when you book"}
+                  </span>
                 </div>
               ) : (
                 <>
                   <div className="row">
                     <span>
-                      {money(listing.price, listing.currency)} &times; {quote.nights} night{quote.nights === 1 ? "" : "s"}
+                      {stayNights.length} night{stayNights.length === 1 ? "" : "s"} &middot; avg {money(avg, listing.currency)} / night
                     </span>
-                    <span>{money(quote.stay, listing.currency)}</span>
+                    <span>{money(nightlySum, listing.currency)}</span>
                   </div>
-                  {quote.clean > 0 && (
-                    <div className="row">
-                      <span>Cleaning &amp; linen</span>
-                      <span>{money(quote.clean, listing.currency)}</span>
-                    </div>
-                  )}
-                  {quote.disc > 0 && (
-                    <div className="row" style={{ color: "var(--sea)" }}>
-                      <span>Weekly stay discount</span>
-                      <span>&minus;{money(quote.disc, listing.currency)}</span>
-                    </div>
-                  )}
                   <div className="row">
-                    <span>Booking fee</span>
-                    <span style={{ color: "var(--sea)" }}>None</span>
-                  </div>
-                  <div className="row total">
-                    <span>Total</span>
-                    <b>{money(quote.total, listing.currency)}</b>
+                    <span>Fees &amp; taxes</span>
+                    <span>Added at checkout</span>
                   </div>
                 </>
               )}
             </div>
             {bookUrl ? (
-              <a href={bookUrl} target="_blank" rel="noreferrer" className="btn">
+              <a
+                href={bookUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn"
+                aria-disabled={blocked || undefined}
+                tabIndex={blocked ? -1 : undefined}
+                style={blocked ? { opacity: 0.45, pointerEvents: "none" } : undefined}
+              >
                 Request to book
               </a>
             ) : (
@@ -198,12 +250,14 @@ export function PropertyModal({ listing, guests, onClose }: Props) {
                 href={buildEnquiryMailto(query)}
                 className="btn"
                 onClick={() => setRequested(true)}
-                style={requested ? { opacity: 0.72, pointerEvents: "none" } : undefined}
+                aria-disabled={blocked || undefined}
+                tabIndex={blocked ? -1 : undefined}
+                style={blocked ? { opacity: 0.45, pointerEvents: "none" } : requested ? { opacity: 0.72, pointerEvents: "none" } : undefined}
               >
                 {requested ? "Request sent" : "Request to book"}
               </a>
             )}
-            <p className="note">Nothing is charged yet. We confirm availability first.</p>
+            <p className="note">Nightly rates are shown before fees and taxes. The final price is shown at checkout, and nothing is charged until you book.</p>
           </div>
         </div>
       </div>

@@ -1,5 +1,3 @@
-import { useListings } from "../hooks/useListings.ts";
-
 /**
  * The prototype's four-stat strip led with a "4.9 average guest rating" —
  * flagged in its own source comment as a placeholder to replace before this
@@ -9,10 +7,7 @@ import { useListings } from "../hooks/useListings.ts";
  * The other three are standing, non-numeric claims about how the business
  * operates, not per-guest data, so they're kept as written.
  */
-export function TrustStrip() {
-  const { listings } = useListings();
-  const count = listings.length;
-
+export function TrustStrip({ count }: { count: number }) {
   return (
     <section className="trust">
       <div className="trust-grid">

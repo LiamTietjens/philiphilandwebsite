@@ -1,43 +1,18 @@
-import type { Listing } from "../data/types.ts";
-import { nightsBetween } from "./dates.ts";
-
 /** "A$1,240" — the prototype's money format, en-AU grouping. */
 export const money = (n: number, currency = "AUD"): string => {
   const prefix = currency === "AUD" ? "A$" : `${currency} `;
   return prefix + Math.round(n).toLocaleString("en-AU");
 };
 
-export interface Quote {
-  nights: number;
-  /** Nightly rate × nights, before fees or discounts. */
-  stay: number;
-  /** Guesty prices.cleaningFee. 0 across most of this portfolio. */
-  clean: number;
-  /** Weekly discount, from Guesty's weeklyPriceFactor. 0 when none applies. */
-  disc: number;
-  total: number;
-}
-
 /**
- * The full cost of a stay, using the listing's real Guesty pricing rather
- * than invented figures: basePrice, cleaningFee, and weeklyPriceFactor.
- *
- * The prototype hard-coded a A$120 cleaning fee and a flat 10% weekly
- * discount. Neither is real here — this portfolio reports cleaningFee 0 and
- * weeklyPriceFactor 1 — so quoting them would overcharge on screen. Rows for
- * a zero fee or zero discount are simply not rendered.
+ * The average of Guesty's own per-night prices for a stay, rounded. This is the
+ * nightly rate BEFORE fees and taxes — Guesty adds a markup, bundled fees and a
+ * levy at checkout, so the calendar's nights do not sum to what a guest pays and
+ * the site never presents them as a total. Null without prices; never a guess.
  */
-export function stayCost(listing: Listing, a: string | null, b: string | null): Quote | null {
-  const nights = nightsBetween(a, b);
-  if (nights <= 0) return null;
-
-  const stay = listing.price * nights;
-  const factor = listing.weeklyFactor;
-  // Guesty expresses a weekly discount as a multiplier < 1 (0.9 = 10% off).
-  const disc = nights >= 7 && factor > 0 && factor < 1 ? Math.round(stay * (1 - factor)) : 0;
-  const clean = listing.cleaningFee;
-
-  return { nights, stay, clean, disc, total: stay + clean - disc };
+export function avgNightly(nightly: number[] | undefined): number | null {
+  if (!nightly || nightly.length === 0) return null;
+  return Math.round(nightly.reduce((sum, n) => sum + n, 0) / nightly.length);
 }
 
 // ─── outbound links ─────────────────────────────────────────────────────────
@@ -49,25 +24,45 @@ const BOOKING_BASE = import.meta.env.VITE_GUESTY_BOOKING_URL as string | undefin
 
 export const ENQUIRY_EMAIL = "phillipislandcohost@gmail.com";
 
+// Guesty's guest-facing site is locale-prefixed; the site is English-only for now.
+const BOOKING_LOCALE = "en";
+
 export interface BookingLinkOpts {
   listingId?: string;
   checkIn?: string;
   checkOut?: string;
+  /** Total guests (adults + kids) — becomes Guesty's `minOccupancy`. */
   guests?: number;
+  /** Adults only, for Guesty's `adults` param. Falls back to `guests` when omitted. */
+  adults?: number;
+}
+
+/**
+ * The Booking Engine path + query for a stay — split out from buildBookingUrl()
+ * so it's testable without VITE_GUESTY_BOOKING_URL (Vite doesn't load .env.local
+ * in test mode). Shape confirmed against a real checkout link:
+ *   https://guest.phillipislandhost.com/en/properties/{id}/checkout
+ *     ?minOccupancy=8&checkIn=2026-10-08&checkOut=2026-10-15&adults=8
+ */
+export function bookingPath(opts: BookingLinkOpts = {}): string {
+  const path = opts.listingId
+    ? `/${BOOKING_LOCALE}/properties/${encodeURIComponent(opts.listingId)}/checkout`
+    : `/${BOOKING_LOCALE}/properties`;
+  const q = new URLSearchParams();
+  if (opts.checkIn) q.set("checkIn", opts.checkIn);
+  if (opts.checkOut) q.set("checkOut", opts.checkOut);
+  if (opts.guests && opts.guests > 0) {
+    q.set("minOccupancy", String(opts.guests));
+    q.set("adults", String(opts.adults ?? opts.guests));
+  }
+  const s = q.toString();
+  return `${path}${s ? `?${s}` : ""}`;
 }
 
 /** Deep link into the Guesty Booking Engine, or null when it isn't configured. */
 export function buildBookingUrl(opts: BookingLinkOpts = {}): string | null {
   if (!BOOKING_BASE) return null;
-  const path = opts.listingId
-    ? `/properties/${encodeURIComponent(opts.listingId)}`
-    : "/properties";
-  const q = new URLSearchParams();
-  if (opts.checkIn) q.set("checkIn", opts.checkIn);
-  if (opts.checkOut) q.set("checkOut", opts.checkOut);
-  if (opts.guests && opts.guests > 0) q.set("minOccupancy", String(opts.guests));
-  const s = q.toString();
-  return `${BOOKING_BASE}${path}${s ? `?${s}` : ""}`;
+  return `${BOOKING_BASE}${bookingPath(opts)}`;
 }
 
 /** Fallback when the Booking Engine URL is unset: a pre-filled enquiry email. */

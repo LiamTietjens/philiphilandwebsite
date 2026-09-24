@@ -23,8 +23,9 @@ useListings()  →  fetch(VITE_LISTINGS_API)  →  public-listings Edge Function
 - Endpoint code: [`backend/supabase/functions/public-listings`](../backend/supabase/functions/public-listings/index.ts)
   (public, `verify_jwt = false`; returns a trimmed, public-safe listing shape).
 - Deploy it, then set `VITE_LISTINGS_API` to its URL (see `.env.example`).
-- **Until that's set, the site falls back to bundled sample homes** (three, under
-  `public/images/sample`) and shows a "sample homes" note, so it always renders.
+- The live endpoint URLs are built in as defaults (`src/lib/api.ts`), so the site
+  never ships with sample data when an env var is missing. If Guesty can't be
+  reached the page says so; it never substitutes made-up homes or prices.
 
 Deploy the endpoint:
 

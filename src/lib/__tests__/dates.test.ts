@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, fmtDay, iso, monthShape, nightsBetween, parseISO } from "../dates.ts";
+import { addMonths, fmtDay, iso, monthShape, fmtRange, nightsBetween, nightsOf, parseISO } from "../dates.ts";
 
 describe("iso / parseISO", () => {
   it("round-trips a local date without a UTC day shift", () => {
@@ -56,5 +56,37 @@ describe("addMonths", () => {
     expect(d.getFullYear()).toBe(2027);
     expect(d.getMonth()).toBe(0);
     expect(d.getDate()).toBe(1); // always normalized to the 1st
+  });
+});
+
+describe("nightsOf", () => {
+  it("lists each night of a stay — arrival day up to, but not including, departure", () => {
+    expect(nightsOf("2026-10-13", "2026-10-16")).toEqual(["2026-10-13", "2026-10-14", "2026-10-15"]);
+  });
+
+  it("crosses month and year boundaries", () => {
+    expect(nightsOf("2026-12-30", "2027-01-02")).toEqual(["2026-12-30", "2026-12-31", "2027-01-01"]);
+  });
+
+  it("is empty without both dates or a positive stay", () => {
+    expect(nightsOf(null, "2026-10-16")).toEqual([]);
+    expect(nightsOf("2026-10-13", null)).toEqual([]);
+    expect(nightsOf("2026-10-13", "2026-10-13")).toEqual([]);
+    expect(nightsOf("2026-10-16", "2026-10-13")).toEqual([]);
+  });
+});
+
+describe("fmtRange", () => {
+  it("collapses the month when both ends share it", () => {
+    expect(fmtRange("2026-10-13", "2026-10-15")).toBe("13 – 15 Oct");
+  });
+
+  it("names both months when the range crosses one", () => {
+    expect(fmtRange("2026-10-30", "2026-11-02")).toBe("30 Oct – 2 Nov");
+    expect(fmtRange("2026-12-30", "2027-01-02")).toBe("30 Dec – 2 Jan");
+  });
+
+  it("shows a single day range as one date", () => {
+    expect(fmtRange("2026-10-13", "2026-10-13")).toBe("13 Oct");
   });
 });

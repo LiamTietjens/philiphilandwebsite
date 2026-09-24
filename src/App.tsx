@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { Listing } from "./data/types.ts";
+import type { Listing, OpenListing } from "./data/types.ts";
 import { BookingProvider, useBooking } from "./context/booking.tsx";
 import { useHashRoute } from "./hooks/useHashRoute.ts";
 import { useListings } from "./hooks/useListings.ts";
@@ -22,7 +22,14 @@ function Page() {
   const route = useHashRoute();
   // Loaded here, not in each page, so landing → all homes → back doesn't refetch.
   const { listings, status } = useListings();
-  const [active, setActive] = useState<Listing | null>(null);
+  const [active, setActive] = useState<{ listing: Listing; prefill: boolean; hint?: string } | null>(null);
+  const open: OpenListing = (listing, opts) => setActive({ listing, prefill: opts?.prefill ?? true, hint: opts?.hint });
+
+  // The dates a popup should carry in: what Search submitted on the listing page,
+  // or what's picked in the hero bar on the landing page.
+  const onListingPage = route === "homes";
+  const stayIn = onListingPage ? (b.applied?.checkIn ?? null) : b.checkIn;
+  const stayOut = onListingPage ? (b.applied?.checkOut ?? null) : b.checkOut;
   useReveal();
 
   // On a real page change: close any open popup, then land on the clicked
@@ -45,13 +52,13 @@ function Page() {
       <Header onPage={route === "homes"} />
       <main>
         {route === "homes" ? (
-          <HomesPage listings={listings} status={status} onOpen={setActive} />
+          <HomesPage listings={listings} status={status} onOpen={open} />
         ) : (
           <>
             <Hero />
-            <TrustStrip />
-            <Stays listings={listings} status={status} onOpen={setActive} />
-            <Story />
+            <TrustStrip count={listings.length} />
+            <Stays listings={listings} status={status} onOpen={open} />
+            <Story listings={listings} />
             <Included />
             <IslandGuide />
             <Quotes />
@@ -60,7 +67,17 @@ function Page() {
         )}
       </main>
       <Footer />
-      {active && <PropertyModal listing={active} guests={b.guests} onClose={() => setActive(null)} />}
+      {active && (
+        <PropertyModal
+          listing={active.listing}
+          guests={b.guests}
+          adults={b.adults}
+          initialStay={active.prefill ? { checkIn: stayIn, checkOut: stayOut } : undefined}
+          viewFrom={stayIn}
+          hint={active.hint}
+          onClose={() => setActive(null)}
+        />
+      )}
     </>
   );
 }

@@ -1,5 +1,6 @@
-import type { Listing } from "../data/types.ts";
+import type { Listing, OpenListing } from "../data/types.ts";
 import type { ListingsStatus } from "../hooks/useListings.ts";
+import { useFromPrices } from "../hooks/useLivePricing.ts";
 import { featuredListings } from "../lib/filter.ts";
 import { HOMES_HASH } from "../lib/route.ts";
 import { PropertyCard } from "./PropertyCard.tsx";
@@ -13,7 +14,7 @@ const arrow = (
 interface Props {
   listings: Listing[];
   status: ListingsStatus;
-  onOpen: (listing: Listing) => void;
+  onOpen: OpenListing;
 }
 
 /**
@@ -23,6 +24,9 @@ interface Props {
 export function Stays({ listings, status, onOpen }: Props) {
   const shown = featuredListings(listings);
   const hasMore = listings.length > shown.length;
+  // Real prices from Guesty's calendar. Totals for particular dates appear on
+  // the listing page, once Search has checked which homes are actually free.
+  const from = useFromPrices(shown.map((l) => l.id));
 
   return (
     <section className="sec" id="stays">
@@ -44,14 +48,16 @@ export function Stays({ listings, status, onOpen }: Props) {
         <p className="count" id="count">
           {status === "loading"
             ? "Loading homes…"
-            : hasMore
+            : status === "error"
+              ? "We couldn't load our homes just now. Please refresh the page, or call us on +61 490 465 855."
+              : hasMore
               ? `Showing ${shown.length} of ${listings.length} homes`
               : `Showing ${shown.length} ${shown.length === 1 ? "home" : "homes"}`}
         </p>
 
         <div className="grid" id="grid">
           {shown.map((l, i) => (
-            <PropertyCard key={l.id} listing={l} index={i} onOpen={() => onOpen(l)} />
+            <PropertyCard key={l.id} listing={l} index={i} onOpen={() => onOpen(l)} from={from[l.id]} />
           ))}
         </div>
 

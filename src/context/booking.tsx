@@ -9,9 +9,10 @@ import type { ReactNode } from "react";
  * speaks local calendar days, and a Date would invite a toISOString() that
  * silently shifts the day for anyone east of UTC.
  *
- * `applied` mirrors the prototype's two-stage behaviour: changing dates
- * re-quotes every card immediately, but destination and guest count only
- * filter the grid once Search is submitted.
+ * `applied` is what Search submitted: destination, guest count and the stay
+ * dates. The listing page filters and prices from it (a home Guesty says is
+ * booked for those dates is hidden); merely picking dates in the search bar
+ * changes nothing until Search is pressed.
  */
 export interface BookingState {
   dest: string;
@@ -20,7 +21,7 @@ export interface BookingState {
   adults: number;
   kids: number;
   dogs: number;
-  applied: { dest: string; guests: number } | null;
+  applied: { dest: string; guests: number; checkIn: string | null; checkOut: string | null } | null;
 }
 
 interface BookingContextValue extends BookingState {
@@ -61,7 +62,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       step: (key, delta) =>
         setState((s) => ({ ...s, [key]: Math.max(floorFor(key), s[key] + delta) })),
       apply: () =>
-        setState((s) => ({ ...s, applied: { dest: s.dest, guests: s.adults + s.kids } })),
+        setState((s) => ({
+          ...s,
+          applied: { dest: s.dest, guests: s.adults + s.kids, checkIn: s.checkIn, checkOut: s.checkOut },
+        })),
       reset: () => setState(initial),
     };
   }, [state]);
