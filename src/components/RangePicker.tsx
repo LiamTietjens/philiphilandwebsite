@@ -12,6 +12,9 @@ interface Props {
   onChange: (checkIn: string | null, checkOut: string | null) => void;
   /** ISO days that cannot be booked, e.g. from useAvailability(). */
   booked?: ReadonlySet<string>;
+  /** ISO days a stay cannot START on, and days it cannot END on (Guesty's closed-to-arrival / closed-to-departure). */
+  closedToArrival?: ReadonlySet<string>;
+  closedToDeparture?: ReadonlySet<string>;
   /** False when availability is unknown — no strike-throughs, and the info
    *  line says so instead of implying every date is free. */
   availabilityKnown?: boolean;
@@ -51,6 +54,8 @@ export function RangePicker({
   checkOut,
   onChange,
   booked,
+  closedToArrival,
+  closedToDeparture,
   availabilityKnown = true,
   checking = false,
   initialMonth,
@@ -83,7 +88,7 @@ export function RangePicker({
           ? "Checking availability…"
           : "Availability isn't confirmed yet — we'll check when you book"
         : booked && booked.size > 0
-          ? "Crossed out dates are already booked"
+          ? "Crossed out dates are booked. Faded dates can\u2019t be used to check in or out."
           : "Pick your arrival date";
 
   function openField(which: "in" | "out") {
@@ -121,13 +126,18 @@ export function RangePicker({
       const past = date < TODAY;
       const beyond = !!maxDate && key > maxDate;
       const taken = availabilityKnown && !!booked?.has(key);
+      // The day being picked is an arrival unless a check-in is already chosen and we're picking a later day to leave.
+      const asArrival = active === "in" || !checkIn || key <= checkIn;
+      const closed =
+        availabilityKnown && !past && !beyond && (asArrival ? !!closedToArrival?.has(key) : !!closedToDeparture?.has(key));
       // Departing on the day the next guest arrives is fine: that night isn't
       // part of the stay. A booked day is only usable as a check-out, and only
-      // when every night before it is free.
+      // when every night before it is free (and the day isn't closed to departure).
       const turnover =
-        taken && !past && active === "out" && !!checkIn && key > checkIn && spanClear(booked, checkIn, key);
+        taken && !past && active === "out" && !!checkIn && key > checkIn && spanClear(booked, checkIn, key) && !closed;
       const classes: string[] = [];
       if (past || beyond) classes.push("is-off");
+      if (closed && !taken) classes.push("is-closed");
       if (taken && !past && !beyond) classes.push("is-booked");
       if (turnover) classes.push("is-turnover");
       if (key === TODAY_ISO) classes.push("is-today");
@@ -135,13 +145,13 @@ export function RangePicker({
       if (checkOut && key === checkOut) classes.push("is-out");
       if (checkIn && end && key > checkIn && key < end && spanClear(booked, checkIn, key)) classes.push("is-mid");
       if (checkIn && checkOut && checkIn === checkOut) classes.push("is-solo");
-      cells.push({ key, day: d, disabled: past || beyond || (taken && !turnover), classes });
+      cells.push({ key, day: d, disabled: past || beyond || (taken && !turnover) || closed, classes });
     }
     return { lead, cells };
   }
 
-  const gridA = useMemo(() => monthDays(view), [view, checkIn, checkOut, hover, active, booked, availabilityKnown, maxDate]);
-  const gridB = useMemo(() => monthDays(monthB), [monthB, checkIn, checkOut, hover, active, booked, availabilityKnown, maxDate]);
+  const gridA = useMemo(() => monthDays(view), [view, checkIn, checkOut, hover, active, booked, closedToArrival, closedToDeparture, availabilityKnown, maxDate]);
+  const gridB = useMemo(() => monthDays(monthB), [monthB, checkIn, checkOut, hover, active, booked, closedToArrival, closedToDeparture, availabilityKnown, maxDate]);
 
   function renderMonth(grid: ReturnType<typeof monthDays>) {
     return (
@@ -162,7 +172,7 @@ export function RangePicker({
               className={["dp-d", ...c.classes].join(" ")}
               data-d={c.key}
               disabled={c.disabled}
-              title={c.classes.includes("is-turnover") ? "Check-out only" : c.classes.includes("is-booked") ? "Already booked" : undefined}
+              title={c.classes.includes("is-turnover") ? "Check-out only" : c.classes.includes("is-booked") ? "Already booked" : c.classes.includes("is-closed") ? (active === "out" && checkIn ? "Check-out isn\u2019t possible this day" : "Check-in isn\u2019t possible this day") : undefined}
               onClick={() => pick(c.key, c.disabled)}
               onMouseOver={() => {
                 if (!c.disabled && active === "out" && checkIn) setHover(c.key);

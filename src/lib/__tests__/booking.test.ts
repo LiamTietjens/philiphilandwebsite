@@ -31,18 +31,23 @@ describe("avgNightly", () => {
 
 // bookingPath() is the path+query half of buildBookingUrl(), split out because
 // VITE_GUESTY_BOOKING_URL isn't loaded under `vitest run` (Vite skips .env.local
-// in test mode) — this is the part we can actually exercise. Shape confirmed
-// against a real checkout link:
+// in test mode) — this is the part we can actually exercise.
+//
+// It targets the PROPERTY page, not /checkout. Verified against the live engine:
+// a cold visit to /checkout is redirected to the generic search list (even for a
+// home that is bookable), while the property page keeps the guest on the home,
+// pre-fills the dates, and shows Guesty's own total + "Book now" (or "no longer
+// available for these dates").
 //   https://guest.phillipislandhost.com/en/properties/63e18360285088002cda224c
-//     /checkout?minOccupancy=8&checkIn=2026-10-08&checkOut=2026-10-15&adults=8
+//     ?minOccupancy=8&checkIn=2026-10-08&checkOut=2026-10-15&adults=8
 describe("bookingPath", () => {
   const parse = (path: string) => new URL(path, "https://x.test");
 
-  it("matches the real Guesty checkout link's shape exactly", () => {
+  it("links to the property page with the dates and guests Guesty's engine reads", () => {
     const u = parse(
       bookingPath({ listingId: "63e18360285088002cda224c", checkIn: "2026-10-08", checkOut: "2026-10-15", guests: 8 }),
     );
-    expect(u.pathname).toBe("/en/properties/63e18360285088002cda224c/checkout");
+    expect(u.pathname).toBe("/en/properties/63e18360285088002cda224c");
     expect(Object.fromEntries(u.searchParams)).toEqual({
       minOccupancy: "8",
       checkIn: "2026-10-08",
@@ -74,14 +79,19 @@ describe("bookingPath", () => {
     expect(u.searchParams.has("checkOut")).toBe(false);
   });
 
-  it("has no /checkout suffix without a listing id — there's nothing to check out of yet", () => {
+  it("never goes through /checkout: a cold visit there is bounced to the search list", () => {
+    const u = parse(bookingPath({ listingId: "abc123", checkIn: "2026-10-08", checkOut: "2026-10-15", guests: 2 }));
+    expect(u.pathname).not.toMatch(/checkout/);
+  });
+
+  it("falls back to the search list without a listing id", () => {
     const u = parse(bookingPath({ checkIn: "2026-10-08" }));
     expect(u.pathname).toBe("/en/properties");
   });
 
   it("URL-encodes the listing id", () => {
     const u = parse(bookingPath({ listingId: "abc/../def" }));
-    expect(u.pathname).toBe("/en/properties/abc%2F..%2Fdef/checkout");
+    expect(u.pathname).toBe("/en/properties/abc%2F..%2Fdef");
   });
 });
 
