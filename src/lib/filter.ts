@@ -1,5 +1,5 @@
 import type { Chip, Listing } from "../data/types.ts";
-import { fmtRange, nightsBetween } from "./dates.ts";
+import { fmtDay, fmtRange, nightsBetween } from "./dates.ts";
 
 /** How many homes the landing page features before pointing at the full list. */
 export const FEATURED_COUNT = 5;
@@ -20,10 +20,13 @@ export interface AppliedSearch {
 export interface StayInfo {
   known: boolean;
   available?: boolean;
-  reason?: "booked" | "min_nights";
+  reason?: "booked" | "min_nights" | "closed_arrival" | "closed_departure" | "max_nights";
   /** One real Guesty price per night of the stay, when every night has one. */
   nightly?: number[];
   minNights?: number;
+  maxNights?: number;
+  /** For closed_arrival / closed_departure: the day Guesty won't allow it. */
+  on?: string;
   /**
    * When the exact stay isn't bookable: the runs of consecutive nights inside it
    * that ARE free (arrive `from`, leave `to`). Non-empty = a partial match.
@@ -120,6 +123,10 @@ export function partialNote(info: StayInfo | undefined, totalNights: number): st
     const need = info.minNights ? `${info.minNights} nights` : "a longer stay";
     return `Free for your dates, but this home needs a minimum stay of ${need}`;
   }
+
+  if (info.reason === "closed_arrival" && info.on) return `Free for your dates, but check-in isn\u2019t possible on ${fmtDay(info.on)}`;
+  if (info.reason === "closed_departure" && info.on) return `Free for your dates, but check-out isn\u2019t possible on ${fmtDay(info.on)}`;
+  if (info.reason === "max_nights" && info.maxNights) return `Free for your dates, but this home takes stays of up to ${info.maxNights} nights`;
 
   const ranges = (info.segments ?? []).map((seg) => fmtRange(seg.from, seg.to));
   let list: string;

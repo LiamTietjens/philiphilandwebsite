@@ -11,13 +11,29 @@ export interface Availability {
   prices: Record<string, number>;
   /** ISO day -> minimum stay when arriving that day. */
   minNights: Record<string, number>;
+  /** ISO days nobody may check IN on (the night is free, but Guesty won't start a stay that day). */
+  closedToArrival: Set<string>;
+  /** ISO days nobody may check OUT on. */
+  closedToDeparture: Set<string>;
+  /** ISO day -> maximum stay when arriving that day. */
+  maxNights: Record<string, number>;
   /** Last day the calendar covers (~12 months out). Beyond it nothing is known. */
   horizon: string | null;
   /** True until the first answer (or failure) arrives. */
   loading: boolean;
 }
 
-const UNKNOWN: Availability = { booked: new Set<string>(), known: false, prices: {}, minNights: {}, horizon: null, loading: false };
+const UNKNOWN: Availability = {
+  booked: new Set<string>(),
+  known: false,
+  prices: {},
+  minNights: {},
+  closedToArrival: new Set<string>(),
+  closedToDeparture: new Set<string>(),
+  maxNights: {},
+  horizon: null,
+  loading: false,
+};
 const LOADING: Availability = { ...UNKNOWN, loading: true };
 
 // The public-availability Supabase Edge Function — wraps Guesty's calendar
@@ -50,6 +66,9 @@ export function useAvailability(listingId: string | null): Availability {
           known?: boolean;
           prices?: Record<string, number>;
           minNights?: Record<string, number>;
+          closedToArrival?: string[];
+          closedToDeparture?: string[];
+          maxNights?: Record<string, number>;
           horizon?: string;
         }) => {
           const res: Availability = {
@@ -57,6 +76,9 @@ export function useAvailability(listingId: string | null): Availability {
             known: !!data.known,
             prices: data.prices ?? {},
             minNights: data.minNights ?? {},
+            closedToArrival: new Set(data.closedToArrival ?? []),
+            closedToDeparture: new Set(data.closedToDeparture ?? []),
+            maxNights: data.maxNights ?? {},
             horizon: data.horizon ?? null,
             loading: false,
           };

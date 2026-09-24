@@ -315,6 +315,8 @@ body.menu-open .mobile-nav{opacity:1;visibility:visible;transform:none}
 .dp-d.is-booked{color:var(--muted);cursor:not-allowed;opacity:.7}
 .dp-d.is-booked span{text-decoration:line-through;text-decoration-thickness:1px}
 .dp-d.is-booked:hover::before{background:none}
+.dp-d.is-closed{color:var(--line);cursor:not-allowed}
+.dp-d.is-closed:hover::before{background:none}
 /* A booked day that can still be a check-out (the next guest arrives that day). */
 .dp-d.is-booked.is-turnover{cursor:pointer;opacity:1}
 .dp-d.is-booked.is-turnover:hover::before{background:var(--sand)}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Chip, Listing } from "../../data/types.ts";
-import { FEATURED_COUNT, featuredListings, filterListings, freeNights, partialNote, splitByStay, splitCountText, type StayMap } from "../filter.ts";
+import { FEATURED_COUNT, featuredListings, filterListings, freeNights, partialNote, splitByStay, splitCountText, type StayInfo, type StayMap } from "../filter.ts";
 
 const home = (id: string, over: Partial<Listing> = {}): Listing => ({
   id,
@@ -212,6 +212,21 @@ describe("partialNote", () => {
   it("explains a minimum-stay refusal instead of pretending the nights are booked", () => {
     const info: StayMap[string] = { known: true, available: false, reason: "min_nights", minNights: 5, segments: [{ from: "2026-10-23", to: "2026-10-25" }] };
     expect(partialNote(info, 2)).toBe("Free for your dates, but this home needs a minimum stay of 5 nights");
+  });
+
+  it("explains a home that is free but closed to check-in that day", () => {
+    const info: StayInfo = { known: true, available: false, reason: "closed_arrival", on: "2027-01-01", segments: [{ from: "2027-01-01", to: "2027-01-06" }] };
+    expect(partialNote(info, 5)).toBe("Free for your dates, but check-in isn\u2019t possible on Fri 1 Jan");
+  });
+
+  it("explains a home that is free but closed to check-out that day", () => {
+    const info: StayInfo = { known: true, available: false, reason: "closed_departure", on: "2027-01-04", segments: [{ from: "2027-01-01", to: "2027-01-04" }] };
+    expect(partialNote(info, 3)).toBe("Free for your dates, but check-out isn\u2019t possible on Mon 4 Jan");
+  });
+
+  it("explains a home whose maximum stay is shorter than the search", () => {
+    const info: StayInfo = { known: true, available: false, reason: "max_nights", maxNights: 7, segments: [{ from: "2026-10-01", to: "2026-10-16" }] };
+    expect(partialNote(info, 15)).toBe("Free for your dates, but this home takes stays of up to 7 nights");
   });
 
   it("says plainly when availability couldn't be confirmed", () => {

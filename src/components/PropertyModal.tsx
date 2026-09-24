@@ -3,7 +3,7 @@ import type { Listing } from "../data/types.ts";
 import { useAvailability } from "../hooks/useAvailability.ts";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll.ts";
 import { avgNightly, buildBookingUrl, buildEnquiryMailto, money } from "../lib/booking.ts";
-import { nightsOf } from "../lib/dates.ts";
+import { fmtDay, nightsOf } from "../lib/dates.ts";
 import { RangePicker } from "./RangePicker.tsx";
 
 const checkSVG = (
@@ -57,7 +57,12 @@ export function PropertyModal({ listing, guests, adults, initialStay, viewFrom, 
   const unavailable = availability.known && stayNights.some((d) => availability.booked.has(d));
   const minStay = checkIn ? availability.minNights[checkIn] : undefined;
   const belowMin = !!minStay && dated && stayNights.length < minStay;
-  const blocked = unavailable || belowMin;
+  // Guesty's checkout also refuses a night-free stay that starts or ends on a closed day, or runs past the maximum.
+  const closedIn = availability.known && !!checkIn && availability.closedToArrival.has(checkIn);
+  const closedOut = availability.known && !!checkOut && availability.closedToDeparture.has(checkOut);
+  const maxStay = checkIn ? availability.maxNights[checkIn] : undefined;
+  const overMax = !!maxStay && dated && stayNights.length > maxStay;
+  const blocked = unavailable || belowMin || closedIn || closedOut || overMax;
   // Guesty's nightly rates are before fees and taxes; the final price is shown at checkout.
   const avg = blocked ? null : avgNightly(nightly);
   const nightlySum = blocked || !nightly ? null : nightly.reduce((a, n) => a + n, 0);
@@ -177,6 +182,8 @@ export function PropertyModal({ listing, guests, adults, initialStay, viewFrom, 
                   setCheckOut(b);
                 }}
                 booked={availability.booked}
+                closedToArrival={availability.closedToArrival}
+                closedToDeparture={availability.closedToDeparture}
                 availabilityKnown={availability.known}
                 checking={availability.loading}
                 initialMonth={viewFrom}
@@ -205,6 +212,20 @@ export function PropertyModal({ listing, guests, adults, initialStay, viewFrom, 
                   <span>
                     Minimum stay for this arrival date is {minStay} nights
                   </span>
+                </div>
+              ) : closedIn ? (
+                <div className="row">
+                  <span>Check-in isn&rsquo;t possible on {fmtDay(checkIn)}</span>
+                  <span>Try another arrival day</span>
+                </div>
+              ) : closedOut ? (
+                <div className="row">
+                  <span>Check-out isn&rsquo;t possible on {fmtDay(checkOut)}</span>
+                  <span>Try another departure day</span>
+                </div>
+              ) : overMax ? (
+                <div className="row">
+                  <span>Maximum stay for this arrival date is {maxStay} nights</span>
                 </div>
               ) : availability.loading ? (
                 <div className="row">
@@ -257,7 +278,7 @@ export function PropertyModal({ listing, guests, adults, initialStay, viewFrom, 
                 {requested ? "Request sent" : "Request to book"}
               </a>
             )}
-            <p className="note">Nightly rates are shown before fees and taxes. The final price is shown at checkout, and nothing is charged until you book.</p>
+            <p className="note">Nightly rates are shown before fees and taxes. The next page shows your final total, and nothing is charged until you book.</p>
           </div>
         </div>
       </div>

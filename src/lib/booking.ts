@@ -40,13 +40,20 @@ export interface BookingLinkOpts {
 /**
  * The Booking Engine path + query for a stay — split out from buildBookingUrl()
  * so it's testable without VITE_GUESTY_BOOKING_URL (Vite doesn't load .env.local
- * in test mode). Shape confirmed against a real checkout link:
- *   https://guest.phillipislandhost.com/en/properties/{id}/checkout
+ * in test mode).
+ *
+ * It targets the property PAGE, not /checkout. Checked against the live engine:
+ * opening /checkout cold (no reservation in progress) bounces the guest to the
+ * generic search list — even for a home that is bookable — whereas the property
+ * page keeps them on the home they clicked, pre-fills the dates and guests, runs
+ * Guesty's own quote and shows the real total with Guesty's "Book now", or says
+ * plainly that the home isn't available for those dates.
+ *   https://guest.phillipislandhost.com/en/properties/{id}
  *     ?minOccupancy=8&checkIn=2026-10-08&checkOut=2026-10-15&adults=8
  */
 export function bookingPath(opts: BookingLinkOpts = {}): string {
   const path = opts.listingId
-    ? `/${BOOKING_LOCALE}/properties/${encodeURIComponent(opts.listingId)}/checkout`
+    ? `/${BOOKING_LOCALE}/properties/${encodeURIComponent(opts.listingId)}`
     : `/${BOOKING_LOCALE}/properties`;
   const q = new URLSearchParams();
   if (opts.checkIn) q.set("checkIn", opts.checkIn);
