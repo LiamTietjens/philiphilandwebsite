@@ -70,6 +70,11 @@ export function Included() {
               <p>{item.body}</p>
             </div>
           ))}
+          {/* Pad the last row so an empty cell shows the card colour, not the dark grid line.
+              6 is the LCM of the 3- and 2-column layouts, so rows stay full at both widths. */}
+          {Array.from({ length: (6 - (ITEMS.length % 6)) % 6 }).map((_, i) => (
+            <div className="inc-item inc-fill" aria-hidden="true" key={`inc-fill-${i}`} />
+          ))}
         </div>
       </div>
     </section>
